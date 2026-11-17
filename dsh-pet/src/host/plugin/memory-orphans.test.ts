@@ -23,7 +23,7 @@ type MemoryFile = Record<string, Record<string, { messages: Messages }>>;
 function tempConfig(): { configPaths: ConfigPaths; clean: () => void } {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-pet-orphans-test-'));
   const configPaths: ConfigPaths = {
-    defaultFile: fileURLToPath(new URL('../../../assets/config.jsonc', import.meta.url)),
+    defaultFile: fileURLToPath(new URL('../../test-fixtures/default-config-with-pet.jsonc', import.meta.url)),
     userFile: join(dir, 'main-config.jsonc'),
     petDir: join(dir, 'pet'),
   };

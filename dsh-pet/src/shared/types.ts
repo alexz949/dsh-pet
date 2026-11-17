@@ -154,6 +154,10 @@ export interface Pet {
   /** 条目级：对话动作联动开关。true = 对话时把 categories 下的动作清单交给模型，
    *  由模型在语境贴合时挑一个当场表演；缺省按关处理。 */
   chatAnimationEnabled?: boolean;
+  /** 全局：宠物会不会「说话」。false（本 fork 默认）= 头上不弹任何文字气泡（碎碎念 / 工作状态 /
+   *  入睡醒来台词 / 余额 / 天气 / 待办提醒）、不自动碎碎念（不调模型）、右键没有对话 / 碎碎念 / 配图 /
+   *  查余额 / 查天气，对话快捷键也不响应。宠物只演动画。true = 原版行为。缺省按 false 处理。 */
+  speechEnabled?: boolean;
   /** 条目级：对话配图张数上限（非负整数，0 = 不限制）。只截「交给模型的清单」，不截碎碎念抽图。 */
   chatImageLimit?: number;
 }

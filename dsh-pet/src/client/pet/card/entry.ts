@@ -162,8 +162,12 @@ export function createCardEntry(rt: CardEntryRuntime) {
       });
     };
 
-    /** 打开对话（菜单、悬停 L、拖拽都走这条）；带图时直接进入待发送状态。 */
-    const openChat = (image?: File): void => mountChat(image ? { image } : {});
+    /** 打开对话（菜单、悬停 L、拖拽都走这条）；带图时直接进入待发送状态。
+     *  说话总开关（speechEnabled，本 fork 默认关）关着时没有对话窗：快捷键、粘贴图、拖图一律不响应。 */
+    const openChat = (image?: File): void => {
+      if (cfgRef.current.speechEnabled !== true) return;
+      mountChat(image ? { image } : {});
+    };
 
     /** 把一张图送进对话：已开着就塞进去（不丢写了一半的字），没开就带图打开。 */
     const openChatWithImage = (file: File): void => {
@@ -354,18 +358,24 @@ export function createCardEntry(rt: CardEntryRuntime) {
         ? { label: '起来', action: 'wake', hint: SLEEP_HOTKEY_HINT }
         : { label: '睡觉', action: 'sleep', hint: SLEEP_HOTKEY_HINT };
       // 与桌面端同一排法。桌面专属的两项（打开软件、重载配置）在网页端没有对应动作，不出现。
+      // 说话总开关关着：不列只会产生文字气泡 / 对话窗的项（对话、碎碎念、配图、查看余额、查询天气）。
+      const speech = cfgRef.current.speechEnabled === true;
       const tree: MenuNode[] = buildCompactMenu({
         primary: [
-          { label: '对话', action: 'chat', hint: CHAT_HOTKEY_HINT },
+          ...(speech ? [{ label: '对话', action: 'chat', hint: CHAT_HOTKEY_HINT } as MenuNode] : []),
           { label: '待办事项', action: 'todo', hint: TODO_HOTKEY_HINT },
           ...(canSleep ? [sleepItem] : []),
         ],
         actions: buildMenuTree(cfgRef.current.animations),
         rare: [
-          { label: '查看余额', action: 'show-balance' },
-          { label: '查询天气', action: 'show-environment' },
-          { label: '碎碎念', action: 'whisper' },
-          ...(memes ? [memes] : []),
+          ...(speech
+            ? ([
+                { label: '查看余额', action: 'show-balance' },
+                { label: '查询天气', action: 'show-environment' },
+                { label: '碎碎念', action: 'whisper' },
+                ...(memes ? [memes] : []),
+              ] as MenuNode[])
+            : []),
           // 显示位置子菜单与桌面端同一份；改成不含 web 的值后本宠物会从页面消失。
           displayMenuBranch(),
           { label: '回到初始位置', action: 'home' },

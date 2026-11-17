@@ -23,26 +23,33 @@ Object.assign(PetSprite.prototype, {
     // 精简菜单（见 shared/menu/tree 的 buildCompactMenu）：第一层只放常用的
     // 对话 / 待办 / 睡觉 + 动作树，其余工具与维护项（以及第三方项）全收进「更多」。
     // 碎碎念/对话无条件显示：手动触发不受 whisperEnabled 限制（该字段只影响自动轮询）。
+    // 说话总开关（speechEnabled，本 fork 默认关）：关着时不列只会产生文字气泡 / 对话窗的项
+    // （对话、碎碎念、配图、查看余额、查询天气）——点了也看不到结果。
+    const speech = this.pet.speechEnabled === true;
     const primary = [
-      { label: '对话', action: 'chat', hint: S.CHAT_HOTKEY_HINT },
+      ...(speech ? [{ label: '对话', action: 'chat', hint: S.CHAT_HOTKEY_HINT }] : []),
       // 「待办事项」是待办面板的唯一入口（单击宠物不再弹面板）
       { label: '待办事项', action: 'todo', hint: S.TODO_HOTKEY_HINT },
     ];
     const rare = [
       // 首项文案与去向随宿主形态变（打开软件 / 打开 AI 设置 / 打开网站），见 OPEN_LABEL
       { label: OPEN_LABEL[OPEN_TARGET], action: 'open-site', hint: OPEN_SHORTCUT_HINT },
-      // 「查看余额」无条件显示：关了 balanceEnabled 的宠物也能点，手动请求不受开关限制，点了一定给答复。
-      { label: '查看余额', action: 'show-balance' },
-      // 「查询天气」与余额同一类：宿主强制刷新并写 sections.env，气泡由 /state 驱动。
-      { label: '查询天气', action: 'show-environment' },
-      { label: '碎碎念', action: 'whisper' },
+      ...(speech
+        ? [
+            // 「查看余额」无条件显示：关了 balanceEnabled 的宠物也能点，手动请求不受开关限制，点了一定给答复。
+            { label: '查看余额', action: 'show-balance' },
+            // 「查询天气」与余额同一类：宿主强制刷新并写 sections.env，气泡由 /state 驱动。
+            { label: '查询天气', action: 'show-environment' },
+            { label: '碎碎念', action: 'whisper' },
+          ]
+        : []),
     ];
     // 「配图」：与浏览器端同一份分支（纳入对话的配图 / 其他），点一张就用它说一句；没有可用图时
     // 返回 null，整项不出现。数据来自拍平层吹入的条目级字段（this.pet.memes / chatImageEnabled /
     // chatImageLimit），与网页端同一个 flattenConfigPets；缩略图走 BASE 的 /pic/memes 绝对地址
     // （桌面窗口是 file://，相对路径取不到图）。
     const memeBranch = S.buildMemeBranch(this.pet, (name) => S.memeThumbUrl(BASE, this.pet.assetRoot, name));
-    if (memeBranch) rare.push(memeBranch);
+    if (memeBranch && speech) rare.push(memeBranch);
     // 睡觉/起来：睡着时这一项是「起来」（点它等于叫醒），醒着时是「睡觉」。两种文案共用一个位置，
     // 在第一层、待办之后（与浏览器端的菜单同一排法）。
     // 该条目没配 animations.sleep 就整项不出现——与配置注释「不写 = 没有睡觉功能」一致。

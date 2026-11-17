@@ -133,6 +133,7 @@ export function createCardRuntime(rt: PetRuntime) {
       balanceManual,
       env: env ?? null,
       workStatusEnabled: cfg.workStatusEnabled,
+      speechEnabled: cfg.speechEnabled === true,
       workTerminal: workStatus?.state === 'success' || workStatus?.state === 'error',
       workSessionId: workStatus?.sessionId ?? null,
       ...(onFocusSession === undefined ? {} : { onFocusSession }),

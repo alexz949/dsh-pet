@@ -133,6 +133,7 @@ $DSH_HOME/dsh-pet/
   "categories": [{ "id": "小动作", "weight": 30, "actions": ["坐着", "互动"] }],
   "states": [{ "name": "坐着", "enter": ["坐下-开始"], "loop": ["坐下-循环"], "exit": ["坐下-起来"], "minLoops": 1, "maxLoops": 3 }]
   ```
+- **`speechEnabled`（全局，本 fork 默认 `false`）说话总开关**：`false` = 宠物不说话——头上不弹任何文字气泡（碎碎念 / 工作状态 / 入睡醒来台词 / 余额 / 天气 / 待办提醒），不自动碎碎念与说梦话（不调模型、不花 token），右键菜单没有「对话 / 碎碎念 / 配图 / 查看余额 / 查询天气」，对话快捷键与拖图开聊也不响应；用户主动打开的待办面板照常。写在 `main-config.jsonc` 顶层 `"speechEnabled": true` 即恢复原版行为。
 - **`animations.moves.default.wanderRange`（可选）漫游半径**：宠物以「家」（最近一次被拖拽 / 抛掷 / 回到初始位置放下的地方）为中心，左右各走这么远（基准宠物宽 462px 下的像素，按 size 缩放）。随机链的下一步会走出范围、或被屏幕边挡住时，改播转身再往回走——于是一直在家附近来回溜达。不写 / `0` = 原行为（越界退回原地动作）。菜单点播的走位不受限。
 - **`pets[].autoSleepMinutes`（可选，实例级）没人理多少分钟后自己去睡**：缺省 / `0` = 关闭。「有人理」= 点 / 拖 / 右键宠物、打开对话、DSH 开始干活（工作状态进入非终态）。到点走与右键「睡觉」同一个请求；自己睡着的宠物在 DSH 再次干活时自己醒，手动哄睡的照旧点一下才醒。需要该条目配了 `animations.sleep`。
 - **睡觉文案按种类各写一份**：`sleepStartTexts` / `sleepEndTexts` / `sleepRefuseTexts`，不写就跟随内置那份；`eventsRefreshSec.sleepTalk` 是梦话周期（秒，默认 60）

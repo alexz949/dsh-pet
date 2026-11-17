@@ -51,7 +51,7 @@ function fakeCtx(reply: string, captured?: Record<string, unknown>[]): unknown {
 function tempWorkspace(overlay: Record<string, unknown> = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-pet-memory-test-'));
   const configPaths: ConfigPaths = {
-    defaultFile: fileURLToPath(new URL('../../assets/config.jsonc', import.meta.url)),
+    defaultFile: fileURLToPath(new URL('../test-fixtures/default-config-with-pet.jsonc', import.meta.url)),
     userFile: join(dir, 'main-config.jsonc'),
     petDir: join(dir, 'pet'), // 不存在 = 无文件宠物
   };

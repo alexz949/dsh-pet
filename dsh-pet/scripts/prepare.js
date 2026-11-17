@@ -49,21 +49,17 @@ const pkg = JSON.parse(readFileSync(PKG, 'utf8'));
 const keep = [
   'lib',
   'src',
-  'assets/webm',
   'runtime/electron-helper',
   'assets/fonts',
   'assets/pic',
-  // 表情包：宿主半侧只从包内 assets/memes 读图，并与配置的 memes 键配对，漏掉即配图功能整体失效。
-  // 本数组每次发布都覆盖 package.json 的 files，所以必须加在这里，只在 package.json 里加一行无效。
-  'assets/memes',
   // 点击音效：宿主半侧的 /sound 路由只读包内这一份，漏掉则点击静音；同 memes，必须加在本数组。
   'assets/sound',
   'assets/config.jsonc',
   // 插件图标：package.json 顶层 icon 指向这张图；缺图时读取方 dsh-app-boot 的 iconOf 会抛错、退回默认插画。
   'assets/logo.png',
-  // 角色参考图：/character 的包内兜底只读 `<素材根>-character.<ext>`，漏发则第三方拿不到官方参考图。
-  // 新增内置角色时在这里补一行（文件名里的素材根跟着角色走）。
-  'assets/main-character.png',
+  // 本 fork 不再内置角色（原作者的 AI 生成角色与它的动画 / 表情包 / 参考图都已移除）：
+  // 角色全部来自用户放进 $DSH_HOME/dsh-pet/pet/ 的宠物包，所以 assets/webm、assets/memes、
+  // assets/main-character.png 不再进包。
   'scripts/ensure-electron.mjs',
   'cordis.patch.yml',
 ];

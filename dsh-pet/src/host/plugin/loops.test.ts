@@ -33,3 +33,11 @@ describe('shouldSleepTalk —— 梦话闸门', () => {
     assert.equal(shouldSleepTalk({ whisperEnabled: true }), false, '缺 display 等于不可见');
   });
 });
+
+test('说话总开关：条目 speechEnabled 不为 true 时不说梦话；不传条目配置保持原判定', () => {
+  const pet = { whisperEnabled: true, display: 'desktop' };
+  assert.equal(shouldSleepTalk(pet), true);
+  assert.equal(shouldSleepTalk(pet, { speechEnabled: true }), true);
+  assert.equal(shouldSleepTalk(pet, { speechEnabled: false }), false);
+  assert.equal(shouldSleepTalk(pet, {}), false);
+});

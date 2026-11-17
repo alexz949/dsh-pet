@@ -453,6 +453,8 @@ Object.assign(PetSprite.prototype, {
       return;
     }
     if (S.isChatHotkey(e)) {
+      // 说话总开关关着：没有对话窗，快捷键不响应（也不吞掉按键）
+      if (this.pet.speechEnabled !== true) return;
       e.preventDefault();
       this.showChatFromMenu();
       return;

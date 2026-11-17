@@ -238,6 +238,8 @@ export function topFieldValid(key: string, value: unknown): boolean {
       return typeof value === 'boolean';
     case 'chatAnimationEnabled':
       return typeof value === 'boolean';
+    case 'speechEnabled':
+      return typeof value === 'boolean';
     case 'confineToScreen':
       return typeof value === 'boolean';
     case 'trayEnabled':

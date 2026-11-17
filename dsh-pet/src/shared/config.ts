@@ -45,6 +45,7 @@ export function flattenConfigPets(merged: Record<string, Record<string, unknown>
         memes: conf.memes as Record<string, string> | undefined,
         chatImageEnabled: conf.chatImageEnabled as boolean | undefined,
         chatAnimationEnabled: conf.chatAnimationEnabled as boolean | undefined,
+        speechEnabled: conf.speechEnabled as boolean | undefined,
         chatImageLimit: conf.chatImageLimit as number | undefined,
         assetRoot: entry,
         extra: entry !== 'main',

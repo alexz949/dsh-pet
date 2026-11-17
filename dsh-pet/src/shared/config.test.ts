@@ -49,7 +49,7 @@ describe('flattenConfigPets —— 成品 → 渲染列表的唯一填充点', (
     const dir = mkdtempSync(join(tmpdir(), 'dsh-pet-flatten-'));
     try {
       const merged = readAllConfig({
-        defaultFile: fileURLToPath(new URL('../../assets/config.jsonc', import.meta.url)),
+        defaultFile: fileURLToPath(new URL('../test-fixtures/default-config-with-pet.jsonc', import.meta.url)),
         userFile: join(dir, 'main-config.jsonc'), // 不存在：只测内置默认
         petDir: join(dir, 'pet'), // 不存在：不掺文件宠物
       });

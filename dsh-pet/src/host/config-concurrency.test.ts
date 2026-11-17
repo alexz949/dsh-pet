@@ -36,7 +36,10 @@ before(async () => {
   dir = mkdtempSync(join(tmpdir(), 'dsh-pet-config-concurrency-'));
   const pkg = join(dir, 'package');
   mkdirSync(join(pkg, 'assets'), { recursive: true });
-  copyFileSync(new URL('../../assets/config.jsonc', import.meta.url), join(pkg, 'assets/config.jsonc'));
+  copyFileSync(
+    new URL('../test-fixtures/default-config-with-pet.jsonc', import.meta.url),
+    join(pkg, 'assets/config.jsonc'),
+  );
   const aliases = Object.fromEntries(
     ['dsh-home-paths', 'dsh-credentials', 'dsh-llm'].map((name) => [
       '@deepseek-ai/' + name,

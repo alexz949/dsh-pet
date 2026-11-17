@@ -64,10 +64,14 @@ Object.assign(PetSprite.prototype, {
     // 终态任务不让位：完成/失败气泡只活 10s，被顶掉就彻底看不到；非终态气泡常驻，让位零损失。
     // 工作气泡与碎碎念同款样式（宽度自适应 + 自动换行）；配图标记交给 CSS（带图时取消 min-width）。
     // 图片 URL 与视频同规则：传 BASE 前缀（桌面是 file:// 页面，必须绝对地址），素材根同理。
-    const workOn = !!(this.workOn && this.workText);
-    const whisperOn = !!(this.whisperOn && this.whisperView);
-    const balanceOn = !!(this.bubbleOn && this.balanceView);
-    const envOn = !!(this.envOn && this.envState);
+    // 说话总开关（speechEnabled，本 fork 默认关）：关着时四类文字气泡一律不显示——
+    // 碎碎念 / 对话 / 入睡醒来台词 / 待办提醒都走 whisper 槽，工作状态、余额、天气各占一槽。
+    // 用户主动打开的待办面板在上面单独处理，不受影响。
+    const speech = this.pet.speechEnabled === true;
+    const workOn = speech && !!(this.workOn && this.workText);
+    const whisperOn = speech && !!(this.whisperOn && this.whisperView);
+    const balanceOn = speech && !!(this.bubbleOn && this.balanceView);
+    const envOn = speech && !!(this.envOn && this.envState);
     const workTerminal = this.workState === 'success' || this.workState === 'error';
     const slot =
       workTerminal && workOn

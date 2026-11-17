@@ -159,6 +159,11 @@ export function registerLoops(deps: LoopsInput): void {
           const found = findPetInstance(cfg, petId);
           if (!found) continue;
           checked += 1;
+          // 说话总开关（speechEnabled，本 fork 默认关）：关着就不生成碎碎念，不调模型、不花 token
+          if (found.conf.speechEnabled !== true) {
+            skipped.push(petId + ': speechEnabled=false');
+            continue;
+          }
           const schedule = automaticWhisperSchedule(
             standaloneAiPolicy(),
             pet.whisperEnabled === true,
@@ -257,7 +262,7 @@ export function registerLoops(deps: LoopsInput): void {
           if (!found) continue;
           // 与碎碎念同口径：关掉碎碎念的宠物不再有任何后台生成，配置上不显示的也不生成（#237）。
           // 放在 min 之前：被跳过的宠物不该把整拍的周期拖住。不推进 lastTalkAt——重新可见后下一拍立刻补一句。
-          if (!shouldSleepTalk(found.pet)) continue;
+          if (!shouldSleepTalk(found.pet, found.conf)) continue;
           const sec = sleepTalkPeriodSec(found.conf);
           min = Math.min(min, sec);
           if (now - (lastTalkAt.get(petId) ?? 0) < sec * 1000) continue;
@@ -294,7 +299,9 @@ export function registerLoops(deps: LoopsInput): void {
  * @returns 两道判定都通过时为 true。
  * @internal
  */
-export function shouldSleepTalk(pet: Record<string, unknown>): boolean {
+export function shouldSleepTalk(pet: Record<string, unknown>, conf?: Record<string, unknown>): boolean {
+  // 说话总开关关着不说梦话（不传 conf = 只看宠物自己的开关，保持原判定）
+  if (conf !== undefined && conf.speechEnabled !== true) return false;
   if (pet.whisperEnabled !== true) return false;
   return isDisplayed(String(pet.display ?? ''));
 }

@@ -146,6 +146,8 @@ export interface BubbleSlotsInput {
   balanceManual: boolean;
   /** 配置是否启用工作状态联动。 */
   workStatusEnabled: boolean;
+  /** 说话总开关（speechEnabled，本 fork 默认关）：关着时除待办面板外的气泡一律不显示。 */
+  speechEnabled: boolean;
   /** 工作状态是否处于终态。 */
   workTerminal: boolean;
   /** 当前展示条目所属会话；有值才把工作气泡做成可点。 */
@@ -353,6 +355,8 @@ export function createBubbleSlots(rt: BubbleSlotsRuntime, components: BubbleComp
         envAvailable: input.env !== null,
       });
       if (slot === 'todo') return h(TodoBubble, { on: todoOn, onClose: hideTodo });
+      // 说话总开关关着：碎碎念 / 对话 / 台词 / 工作状态 / 余额 / 天气气泡都不显示（待办面板是用户主动打开的，照常）
+      if (!input.speechEnabled) return null;
       if (slot === 'env') {
         return input.env === null ? null : h(EnvBubble, { state: input.env, on: envOn });
       }
