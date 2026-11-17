@@ -1,13 +1,16 @@
 {
   "name": "dsh-pet",
-  "owner": { "name": "alexz949", "url": "https://github.com/alexz949" },
+  "owner": {
+    "name": "alexz949",
+    "url": "https://github.com/alexz949"
+  },
   "description": "dsh-pet 桌宠的 Claude Code 插件",
   "plugins": [
     {
       "name": "dsh-pet",
       "source": "./integrations/claude-code",
-      "description": "让 dsh-pet 桌宠跟着 Claude Code 干活：思考、调用工具、等你批准（坐下等）、完成。",
-      "version": "0.1.0",
+      "description": "会话开始时自动拉起 dsh-pet 桌宠（独立模式，不需要开 DSH）；DSH 里已经有桌宠就不再拉起第二套。",
+      "version": "0.2.0",
       "category": "fun",
       "tags": ["desktop-pet", "hooks"]
     }

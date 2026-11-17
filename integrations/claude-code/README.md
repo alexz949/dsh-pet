@@ -1,16 +1,8 @@
 # dsh-pet for Claude Code
 
-让 [dsh-pet](https://github.com/alexz949/dsh-pet) 桌宠跟着 Claude Code 干活：
+会话开始时自动拉起 [dsh-pet](https://github.com/alexz949/dsh-pet) 桌宠：用独立模式在后台启动，不需要开 DSH；DSH 里已经有桌宠在跑、或桌宠已经在跑时什么都不做，不会出现第二套。
 
-| Claude Code | 桌宠 |
-|---|---|
-| 会话开始 | 桌宠没在跑就在后台拉起（独立模式，不需要开 DSH） |
-| 你发消息 | 思考 |
-| 调用工具 | 干活 |
-| 等你批准 | 坐下来一直等，批准后站起来接着干 |
-| 一轮结束 | 完成 |
-| 出错 | 出错 |
-| 会话结束 | 回到空闲 |
+桌宠不跟着 Claude Code 的工作状态切动作，只按宠物包里设定的概率自己待机、走动、坐着（想要联动的话，宠物配置里打开 `workStatusEnabled`，并自行加上推送状态的 hook，脚本 `scripts/pet.mjs` 支持 `thinking / working / waiting / success / error / idle`）。
 
 ## 安装
 
@@ -27,17 +19,10 @@ claude plugin install dsh-pet@dsh-pet
 
 ## 前提
 
-- 本机装了 dsh-pet 插件包（任选其一）：
-  - DSH 里装过 dsh-pet（插件会自动在 `~/.dsh/profiles/*/node_modules/dsh-pet` 找到它）；
-  - 或全局装了包里的 `dsh-pet-standalone` 命令；
-  - 或用环境变量 `DSH_PET_STANDALONE` 指向 `lib/standalone.js`。
+- 本机装了 dsh-pet 插件包（任选其一）：DSH 里装过（自动在 `~/.dsh/profiles/*/node_modules/dsh-pet` 找到）；或全局装了包里的 `dsh-pet-standalone` 命令；或用环境变量 `DSH_PET_STANDALONE` 指向 `lib/standalone.js`。
 - Node.js ≥ 22.12。首次启动桌面模式时，dsh-pet 会下载一次 Electron（约 110 MB，之后复用）。
 - 宠物包放在 `~/.dsh/dsh-pet/pet/`（见 dsh-pet 的 CONFIG.md「额外宠物（pet pack）」）。
 
-## 和 DSH 一起用
-
-DSH 开着、桌宠已经在 DSH 里跑时，本插件不会再拉起第二套，而是把状态直接推给 DSH 里的桌宠。
-
 ## 实现
 
-所有 hook 都是异步的（`"async": true`），Claude Code 不等它们；脚本 `scripts/pet.mjs` 每次最多约 1.5 秒、不输出、失败也安静退出，不会卡住或打断 Claude Code。
+只有一个异步的 `SessionStart` hook（Claude Code 不等它）。脚本不输出、失败也安静退出，不会卡住或打断 Claude Code。排查：`DSH_PET_HOOK_DEBUG=1` → `~/.dsh/dsh-pet/claude-hooks.log`。

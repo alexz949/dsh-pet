@@ -16,22 +16,14 @@
 
 ## 配合 Claude Code / Codex 使用
 
-桌宠可以跟着 Claude Code 干活（思考、调用工具、等你批准时坐下来等、完成），不开 DSH 也行——插件会用独立模式在后台拉起桌宠：
+装上插件后，Claude Code / Codex 会话一开始就自动拉起桌宠（不开 DSH 也行，用独立模式；已经有桌宠在跑就不再拉起）：
 
 ```
-/plugin install dsh-pet --marketplace alexz949/dsh-pet
+/plugin install dsh-pet --marketplace alexz949/dsh-pet          # Claude Code
+codex plugin marketplace add alexz949/dsh-pet && codex plugin add dsh-pet@dsh-pet   # Codex（装完需信任一次 hooks）
 ```
 
-详见 [integrations/claude-code](integrations/claude-code/README.md)。
-
-**Codex** 同样支持（装完需在 Codex 里信任一次 hooks）：
-
-```
-codex plugin marketplace add alexz949/dsh-pet
-codex plugin add dsh-pet@dsh-pet
-```
-
-详见 [integrations/codex](integrations/codex/README.md)。
+详见 [integrations/claude-code](integrations/claude-code/README.md) 与 [integrations/codex](integrations/codex/README.md)。
 
 ## 安装（从源码）
 
@@ -70,6 +62,7 @@ dsh plugin --profile desktop add ../release/dsh-pet-<版本>.tgz
 - **其他**：点击音效、系统托盘与每只宠物的显示位置。
 
 各项能力的详细说明见 **[FEATURES.md](FEATURES.md)**；配置（大小 / 位置 / 多开 / 物理 / 模型 / 人设 / 宠物种类）见 **[CONFIG.md](CONFIG.md)**。
+
 ## 🔌 对外接口（供其他插件调用）
 
 桌宠不只自己玩，也**对外开放两条调用通道**，让别的插件或脚本能驱动它、读它的状态。
@@ -87,17 +80,20 @@ dsh plugin --profile desktop add ../release/dsh-pet-<版本>.tgz
 - [`CORDIS.md`](CORDIS.md) —— 对外 Cordis 服务（客户端半侧，页面内 `ctx.get('petApi7340')`，不走网络）
 - [`tools/api-tester.html`](tools/api-tester.html) —— HTTP 侧示例：桌宠控制台，扮演第三方消费方，可直观试用（`node tools/api-tester.cjs` 启动）
 - [`tools/cordis-probe`](tools/cordis-probe/README.md) —— Cordis 侧示例：扮演同页客户端插件，用 `ctx.get()` 消费服务
+
 ## 兼容性
 
 - **操作系统**：Windows / Linux / macOS 三端均可运行——浏览器 overlay 与桌面模式（Electron 透明置顶窗）行为完全一致；Electron 按平台自动探测/下载（`electron.exe` / `Electron.app` / linux 单文件），无需手动安装
 - **无头 / 无桌面环境**：支持 Linux headless 等无图形会话——桌面模式自动检测显示环境（Linux 无 `DISPLAY` / `WAYLAND_DISPLAY` 时判定无显示、跳过桌面窗口，仅日志告警），浏览器 overlay 不受影响
 - **浏览器**：浏览器 overlay 兼容 **Chromium 内核（Chrome / Edge 等）与 Firefox**——透明动画依赖 VP9-Alpha webm，三者均已实测透明确认；**不支持 Safari**（macOS 不认 webm alpha，透明渲染为黑底）——macOS 用 `.mov` 素材（GitHub Release `assets-mov`），下载放入即可（见「②.5 Safari/HEVC 兼容素材」）
 - **多显示器**：支持多屏环境——跨屏漫游/抛掷以各屏工作区为界，异构缩放（各屏 DPI 不同）、任务栏条带、屏幕之间空洞均正确判定（横屏 / 竖屏 / 上下叠放皆可）；设置页「锁定在当前屏幕」可让宠物（抛掷与漫游）只在当前所在那块屏内活动
+
 ## 从零生成你自己的宠物
 
 AI 提示词 → 绿幕视频 → 透明动画 → 插件，换角色、换动作、换风格，全流程可复现。
 
 完整步骤见 **[MAKE-YOUR-OWN-PET.md](MAKE-YOUR-OWN-PET.md)**（素材要求、素材链、Safari 兼容、发布）。
+
 ## 项目结构
 
 只列代码与发布相关目录；素材链的 video / scripts / step / pr 见 [MAKE-YOUR-OWN-PET.md](MAKE-YOUR-OWN-PET.md) 的 ② 章节（gitignore 的本地目录不列）：
@@ -118,9 +114,11 @@ AI 提示词 → 绿幕视频 → 透明动画 → 插件，换角色、换动�
 │   └── scripts/        # 构建、发布与开发脚本
 └── LICENSE             # MIT
 ```
+
 ## 相关项目
 
 - **[aipets](https://github.com/kallen-noelle/aipets)** —— Windows 11 桌面宠物，五个角色可多开，透明置顶、点击穿透、甩动带惯性。特色在**动作由大模型决定**：每轮对话后模型结合时间、天气、电量与好感度挑动作，无人说话时还能排出接近一整天的编排，模型不可用时回退内置规则。聊天接任意 OpenAI 兼容接口，带长期记忆、贴纸、画图与工具调用（联网搜索 / Home Assistant / MCP），支持语音朗读与语音输入；同一套代码既有单文件 `aipets.exe` 桌面版，也有浏览器里的整页舞台版。
+
 ## 💬 反馈与发版节奏
 
 欢迎提 [issue](https://github.com/PC2005-cloud/dsh-pet/issues) 与 PR——bug、体验问题随时反馈。**新功能请先开 issue** 说明使用场景，确认后再动手，不要在确认前直接提交实现 PR。这个插件专注桌宠与 DSH 本身，偏离太远的需求一般不会做。动手前也请先翻一眼 [提交记录](https://github.com/PC2005-cloud/dsh-pet/commits/main)，确认不是已经修掉的同款问题（有些问题可能已经在 `main` 上修好了，只是还没发版）。
@@ -128,6 +126,7 @@ AI 提示词 → 绿幕视频 → 透明动画 → 插件，换角色、换动�
 - **小修不单独发版**：不影响使用的小 bug 与优化会**累计**到下一个版本一起发，避免版本更迭过于频繁。所以「`main` 上已经修了」不等于「你装的这版已经包含」——`latest` 没更新时，以 `main` 的提交记录为准。
 - **想立刻用上未发布的修复**：按 [INSTALL.md](INSTALL.md) 的「从源码安装」把插件指向本地仓库即可；注意**宿主半侧**的代码改动要**重开 DSH** 才生效（浏览器半侧刷新页面即可）。
 - **报 bug 时请带上**：插件版本、`dsh` 版本、操作系统、复现步骤（有日志或截图更好）。
+
 ## 许可
 
 - 代码：MIT

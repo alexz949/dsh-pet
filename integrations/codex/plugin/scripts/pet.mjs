@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Codex ↔ 桌宠：把 Codex 的工作状态推给 dsh-pet（hooks 调用）。
+ * Codex ↔ 桌宠：会话开始时（hooks 调用 `start`）没桌宠就拉起一只；也保留推状态的子命令备用。
  *
  * 用法：node pet.mjs <start|thinking|working|waiting|success|error|idle>
  *   start   会话开始：桌宠没在跑就在后台拉起独立模式（DSH 里已经有桌宠就不拉，免得两套）
@@ -45,19 +45,33 @@ function standaloneTarget() {
   }
 }
 
-/** DSH 里的桌宠：桌面窗口进程在跑 → 从日志里最近一次「desktop helper started (config: …)」取宿主地址。 */
-function dshTarget() {
+/**
+ * DSH 里的桌宠：桌面窗口进程在跑 → 从日志里最近一次「desktop helper started (config: …)」取宿主地址，
+ * 并且这个地址真的连得上才算（桌宠刚退出时窗口进程会多活一小会儿，日志里也可能是独立模式留下的旧地址，
+ * 不验证就会误以为「DSH 里有桌宠」而不去拉起）。
+ */
+async function dshTarget() {
   let running = false;
   try {
-    running = execFileSync('pgrep', ['-f', 'dsh-pet/runtime/electron-helper/main.js'], { encoding: 'utf8' }).trim() !== '';
+    running =
+      execFileSync('pgrep', ['-f', 'dsh-pet/runtime/electron-helper/main.js'], {
+        encoding: 'utf8',
+      }).trim() !== '';
   } catch {
     running = false;
   }
   if (!running) return null;
   try {
     const log = readFileSync(LOG_FILE, 'utf8');
-    const all = [...log.matchAll(/desktop helper started \(config: (http:\/\/127\.0\.0\.1:\d+)\/dsh-pet-7340\/config\)/g)];
-    return all.length ? { origin: all[all.length - 1][1], token: null } : null;
+    const all = [
+      ...log.matchAll(/desktop helper started \(config: (http:\/\/127\.0\.0\.1:\d+)\/dsh-pet-7340\/config\)/g),
+    ];
+    if (!all.length) return null;
+    const origin = all[all.length - 1][1];
+    await fetch(origin + ROUTE + '/state', {
+      signal: AbortSignal.timeout(500),
+    }); // 连不上会抛错 → null
+    return { origin, token: null };
   } catch {
     return null;
   }
@@ -69,7 +83,9 @@ function standaloneEntry() {
     return { cmd: process.execPath, args: [process.env.DSH_PET_STANDALONE] };
   }
   try {
-    const bin = execFileSync('/usr/bin/which', ['dsh-pet-standalone'], { encoding: 'utf8' }).trim();
+    const bin = execFileSync('/usr/bin/which', ['dsh-pet-standalone'], {
+      encoding: 'utf8',
+    }).trim();
     if (bin) return { cmd: bin, args: [] };
   } catch {
     /* PATH 上没有 */
@@ -86,7 +102,7 @@ function standaloneEntry() {
   return null;
 }
 
-/** 后台拉起独立模式（与本进程脱离，Claude Code 会话结束也不受影响），最多等 8 秒到它写出运行状态。 */
+/** 后台拉起独立模式（与本进程脱离，Codex 会话结束也不受影响），最多等 8 秒到它写出运行状态。 */
 async function launchStandalone() {
   const entry = standaloneEntry();
   if (!entry) return null;
@@ -111,7 +127,11 @@ async function send(target, state) {
   const init =
     state === 'idle'
       ? { method: 'DELETE', headers }
-      : { method: 'POST', headers, body: JSON.stringify({ state, task: null }) };
+      : {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ state, task: null }),
+        };
   await fetch(url, { ...init, signal: AbortSignal.timeout(1500) });
 }
 
@@ -129,7 +149,7 @@ async function main() {
   const action = process.argv[2] || '';
   // 读掉 hooks 喂进来的 stdin（不读的话某些情况下写端会阻塞）
   if (!process.stdin.isTTY) process.stdin.resume().on('data', () => {});
-  const target = standaloneTarget() || dshTarget();
+  const target = standaloneTarget() || (await dshTarget());
   if (action === 'start') {
     if (target) debug('start: 桌宠已在跑 ' + target.origin);
     else debug('start: 拉起独立模式 → ' + ((await launchStandalone())?.origin ?? '失败'));
