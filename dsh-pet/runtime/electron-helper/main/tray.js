@@ -16,6 +16,7 @@ const path = require('node:path');
  * @param deps.Tray - Electron Tray 构造器。
  * @param deps.Menu - Electron Menu（模板 → 菜单）。
  * @param deps.nativeImage - Electron nativeImage（图标）。
+ * @param deps.importPet - 托盘「导入干员…」：弹选择框导入新干员（全新安装没有宠物可右键时的唯一入口）。
  * @param deps.setDisplayLocal - 就地改某只宠物的 display 并单开 / 单关窗口；处理了返回 true。
  * @param deps.hostRequest - 与宿主通信（读配置、改 display、请求退出）。
  * @param deps.callbackUrl - bridge 回调地址（建托盘前要等它就绪）。
@@ -30,6 +31,7 @@ function createTray({
   Tray,
   Menu,
   nativeImage,
+  importPet,
   setDisplayLocal,
   hostRequest,
   callbackUrl,
@@ -109,7 +111,8 @@ function createTray({
         display: String((pet && pet.display) || ''),
       }))
       .filter((pet) => pet.id);
-    if (!pets.length) return null; // 配置里没有任何宠物：没有可切换的对象，不建托盘
+    // 配置里没有任何宠物：也要留着托盘——「导入干员…」是全新安装时唯一的入口
+    if (!pets.length && typeof importPet !== 'function') return null;
     const canQuit = await canQuitSelf();
     const quitApp = () => {
       if (!isBridge || appMode) {
@@ -122,6 +125,9 @@ function createTray({
       });
     };
     return Menu.buildFromTemplate([
+      ...(typeof importPet === 'function'
+        ? [{ label: '导入干员…', click: () => void importPet() }, ...(pets.length ? [{ type: 'separator' }] : [])]
+        : []),
       ...pets.map((pet) => ({
         label: pet.name || pet.id,
         type: 'checkbox',

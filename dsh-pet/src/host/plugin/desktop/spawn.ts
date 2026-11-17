@@ -26,7 +26,8 @@ export type DesktopSpawnInput = Pick<
   DesktopHelperDeps,
   'ctx' | 'getHandlePetRoute' | 'log' | 'reportDownload' | 'thumbUserRoot'
 > &
-  Pick<DesktopPets, 'getHasDesktopPet' | 'desktopPetList' | 'getTrayOn'>;
+  Pick<DesktopPets, 'getHasDesktopPet' | 'desktopPetList' | 'getTrayOn'> &
+  Partial<Pick<DesktopPets, 'getHasNoPets'>>;
 
 /** 宿主是不是 DSH 桌面应用（Electron 宿主）。 */
 const isDesktopHost = (): boolean => Boolean(process.versions.electron);
@@ -54,6 +55,9 @@ export function resolveOpenTarget(siteUrl: string, desktopHost: boolean): OpenTa
 export function createDesktopSpawn(deps: DesktopSpawnInput) {
   const { ctx, getHandlePetRoute, log, reportDownload, thumbUserRoot, getHasDesktopPet, desktopPetList, getTrayOn } =
     deps;
+  const getHasNoPets = deps.getHasNoPets ?? (() => false);
+  /** 没有桌面宠物时要不要为托盘常驻：桌面模式启用过，或一只宠物都没有（全新安装要靠托盘导入），且托盘开着。 */
+  const keepForTray = (): boolean => (desktopModeEverActive || getHasNoPets()) && getTrayOn();
 
   let desktopModeEverActive = false;
 
@@ -77,7 +81,7 @@ export function createDesktopSpawn(deps: DesktopSpawnInput) {
     if (inProcessHost) return; // 应用模式：窗口由本进程建，绝不 spawn
     if (helper || disposed) return;
     // 无桌面宠物时：只有「桌面模式曾启用过且托盘还开着」才值得为托盘常驻，否则不启动
-    if (!getHasDesktopPet() && !(desktopModeEverActive && getTrayOn())) return;
+    if (!getHasDesktopPet() && !keepForTray()) return;
     const port = typeof ctx.webServer?.port === 'number' ? ctx.webServer.port : 0;
     if (!port || port <= 0) {
       // webServer 可能尚未完成监听（OS 分配端口时 port 短暂为 0）：延迟重试。
@@ -158,7 +162,7 @@ export function createDesktopSpawn(deps: DesktopSpawnInput) {
   const startHelper = (): void => {
     if (inProcessHost) return; // 应用模式：不探测、不下载 Electron
     if (helper || electronEnsure || disposed) return;
-    if (!getHasDesktopPet() && !(desktopModeEverActive && getTrayOn())) {
+    if (!getHasDesktopPet() && !keepForTray()) {
       // 诊断日志（issue #168）：这条短路不打日志，就是「桌面模式凭空消失：无进程、无目录、无提示」
       // 的直接成因。用 info 而非 warn——纯网页用户这是正常状态；只打一次避免刷屏。
       // 托盘关掉后这里也会命中：没人需要那个图标，空常驻没有意义。

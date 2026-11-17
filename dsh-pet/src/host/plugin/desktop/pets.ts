@@ -48,6 +48,16 @@ export function createDesktopPets(deps: DesktopPetsInput) {
     }
   };
 
+  /** 一只宠物都没有（全新安装、还没导入干员）：这时也要起 helper 留着托盘，托盘里的「导入干员…」是唯一入口。
+   *  读配置失败按「有」处理，不为坏配置起空进程。 */
+  const getHasNoPets = (): boolean => {
+    try {
+      return readDecision(configPaths).pets.length === 0;
+    } catch {
+      return false;
+    }
+  };
+
   /** 托盘开关的当前值；读失败按「仍要托盘」处理（保守保留常驻图标）。 */
   const getTrayOn = (): boolean => {
     try {
@@ -86,7 +96,7 @@ export function createDesktopPets(deps: DesktopPetsInput) {
   // 装配时先打一行，便于对照「这次进程起来时判定成了什么」。
   logDesktopDecision();
 
-  return { getHasDesktopPet, getTrayOn, desktopPetList, logDesktopDecision };
+  return { getHasDesktopPet, getHasNoPets, getTrayOn, desktopPetList, logDesktopDecision };
 }
 
 /** DesktopPets的产出。 */

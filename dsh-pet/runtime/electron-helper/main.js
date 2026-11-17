@@ -49,6 +49,7 @@ const { createDpi } = require('./main/dpi.js');
 const { createBridge } = require('./main/bridge.js');
 const { createTray } = require('./main/tray.js');
 const { setPackPetDisplay, desktopCopyCounts } = require('./main/manage.js');
+const { importPetInteractive } = require('./main/import.js');
 const { createWindows } = require('./main/windows.js');
 const { registerIpc } = require('./main/ipc.js');
 const { createDisplaySync } = require('./main/displays.js');
@@ -247,7 +248,36 @@ function petsChanged() {
   }
 }
 
+/** 托盘「导入干员…」：与右键菜单同一套流程，导入完只给新干员开窗。 */
+let trayImporting = false;
+async function importPetFromTray() {
+  if (trayImporting) return;
+  trayImporting = true;
+  try {
+    const { dialog } = require('electron');
+    const r = await importPetInteractive({
+      dialog,
+      BrowserWindow,
+      ipcMain,
+      petDir: path.join(dshHomeDir(), 'dsh-pet', 'pet'),
+      parent: undefined,
+    });
+    if (r.ok) {
+      for (const pet of r.pets) {
+        if (r.replaced) petWindows.closePet(pet.id);
+        petWindows.openPet(pet.id, pet.size);
+      }
+      petsChanged();
+    }
+  } catch (e) {
+    console.error('[dsh-pet-desktop-helper] tray import failed:', String(e && e.message ? e.message : e));
+  } finally {
+    trayImporting = false;
+  }
+}
+
 const tray = createTray({
+  importPet: importPetFromTray,
   setDisplayLocal: setPetDisplayLocal,
   app,
   Tray,
