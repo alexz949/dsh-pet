@@ -63,6 +63,10 @@ contextBridge.exposeInMainWorld('petBridge', {
   captureScreen() {
     return ipcRenderer.invoke('pet:capture-screen');
   },
+  /** 分身数广播：主进程在单窗增删后发 { 素材根: 只数 }。 */
+  onCopies(cb) {
+    ipcRenderer.on('pet:copies', (_event, counts) => cb(counts));
+  },
   /** 位置记录：重载后接着站在原处（主进程写盘）。 */
   savePose(id, pose) {
     ipcRenderer.send('pet:save-pose', { id, pose });

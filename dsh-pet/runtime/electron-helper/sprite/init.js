@@ -11,12 +11,27 @@
 const POSE_SAVE_MS = 1000;
 const POSE_REFRESH_MS = 5000;
 
+/**
+ * 分身平分：标了 splitAcrossCopies 的分类（如「特别」）权重按 1/copies 算，其余原样。
+ * 分类之间按权重归一（shared 的 pickWeightedCategory），所以减下来的份额按比例落到其它分类上。
+ */
+function withCopyShare(animations, copies) {
+  const n = Math.max(1, Math.floor(Number(copies) || 1));
+  if (n === 1 || !Array.isArray(animations.categories)) return animations;
+  return {
+    ...animations,
+    categories: animations.categories.map((c) => (c.splitAcrossCopies ? { ...c, weight: c.weight / n } : c)),
+  };
+}
+
 Object.assign(PetSprite.prototype, {
   initPlayback(pet) {
     // 动画池与权重由拍平层按条目注入（renderer 的 S.flattenConfigPets），条目缺 animations 就是配置不全：
     // 明确报错交给 boot 的红条与 5s 重试，绝不回落到没有定义的全局（那只会变成一句 ReferenceError）。
     if (!pet.animations) throw new Error('宠物缺少 animations 段：' + String(pet.id ?? ''));
-    this.animations = pet.animations;
+    // 原始动画配置留一份：分身数变化时（复制 / 隐藏 / 删除同一干员）从它重新派生
+    this.baseAnimations = pet.animations;
+    this.animations = withCopyShare(pet.animations, pet.copies || 1);
     this.weights = pet.animationWeights;
     this.front = 0; // 0 = A, 1 = B
     this.pending = null;
@@ -226,6 +241,11 @@ Object.assign(PetSprite.prototype, {
     }
     this.position();
     this.poseSaveTimer = window.setInterval(() => this.savePose(), POSE_SAVE_MS);
+  },
+
+  /** 同一干员的桌面分身数变了（主进程广播）：重新派生分类权重，正在播的不打断。 */
+  setCopies(copies) {
+    this.animations = withCopyShare(this.baseAnimations, copies);
   },
 
   /** 报当前位置与朝向给主进程（只在变化时报；在角落报 null）。 */

@@ -48,7 +48,7 @@ const { runSmokeCheck } = require('./main/smoke.js');
 const { createDpi } = require('./main/dpi.js');
 const { createBridge } = require('./main/bridge.js');
 const { createTray } = require('./main/tray.js');
-const { setPackPetDisplay } = require('./main/manage.js');
+const { setPackPetDisplay, desktopCopyCounts } = require('./main/manage.js');
 const { createWindows } = require('./main/windows.js');
 const { registerIpc } = require('./main/ipc.js');
 const { createDisplaySync } = require('./main/displays.js');
@@ -234,8 +234,17 @@ function setPetDisplayLocal(id, display) {
   if (!done) return false;
   if (display === 'desktop' || display === 'both') petWindows.openPet(id, done.size);
   else petWindows.closePet(id);
-  void tray.refresh();
+  petsChanged();
   return true;
+}
+
+/** 单窗增删之后：刷新托盘，并把各干员的分身数告诉所有窗口（分身平分特别动作的概率）。 */
+function petsChanged() {
+  void tray.refresh();
+  const counts = desktopCopyCounts(path.join(dshHomeDir(), 'dsh-pet', 'pet'));
+  for (const win of petWindows.state.windows.values()) {
+    if (!win.isDestroyed()) win.webContents.send('pet:copies', counts);
+  }
 }
 
 const tray = createTray({
@@ -322,7 +331,7 @@ app.whenReady().then(() => {
     shell,
     openTarget: OPEN_TARGET,
     petRoute: PET_ROUTE,
-    onPetsChanged: () => tray.refresh(),
+    onPetsChanged: () => petsChanged(),
   });
   createDisplaySync({ screen, petWindows, dpi });
 

@@ -90,6 +90,9 @@ async function boot() {
       return;
     }
     for (const s of sprites) s.dispose();
+    // 同一个宠物包（素材根）现在在桌面上开了几只：用于分身平分（splitAcrossCopies）
+    const root = pet.assetRoot || pet.id;
+    pet.copies = pets.filter((p) => (p.assetRoot || p.id) === root).length;
     sprites = [new PetSprite(pet)];
     window.__dshPetDebug.configOk = true;
     window.__dshPetDebug.spriteCount = sprites.length;
@@ -157,3 +160,13 @@ window.addEventListener('resize', () => {
 if (S.PET_ALPHA_FIX_ENABLED) document.documentElement.classList.add('pet-alpha-fix');
 injectAssets();
 void boot();
+
+// 分身数变化（复制 / 隐藏 / 删除 / 托盘开关只动单个窗口，不重载）：主进程广播 { 素材根: 只数 }
+if (window.petBridge && typeof window.petBridge.onCopies === 'function') {
+  window.petBridge.onCopies((counts) => {
+    for (const s of sprites) {
+      const n = counts && counts[s.pet.assetRoot || s.pet.id];
+      if (Number.isFinite(n) && n > 0) s.setCopies(n);
+    }
+  });
+}

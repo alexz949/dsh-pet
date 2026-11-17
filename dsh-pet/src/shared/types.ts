@@ -37,6 +37,9 @@ export interface Category {
   id: string;
   weight: number;
   noMirror?: boolean;
+  /** 按分身数平分：同一个宠物包在桌面上开了 N 只时，每只的这一类权重按 1/N 算，
+   *  屏幕上这个干员的总频率不随复制变多。减下来的份额按比例落到其它分类（分类间本来就按权重归一）。 */
+  splitAcrossCopies?: boolean;
   actions: string[];
 }
 

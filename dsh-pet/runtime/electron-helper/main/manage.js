@@ -179,4 +179,35 @@ function setPackPetDisplay(petDir, id, display) {
   return null;
 }
 
-module.exports = { setPackPetDisplay, nextCopyId, addCopy, removeInstance, copyPetInteractive, deletePetInteractive };
+/** 各宠物包在桌面上显示的只数：{ 包名（= 素材根）: 只数 }。 */
+function desktopCopyCounts(petDir) {
+  const out = {};
+  let files = [];
+  try {
+    files = fs.readdirSync(petDir).filter((f) => /-config\.json$/.test(f));
+  } catch {
+    return out;
+  }
+  for (const f of files) {
+    try {
+      const config = JSON.parse(fs.readFileSync(path.join(petDir, f), 'utf8'));
+      const pets = Array.isArray(config.pets) ? config.pets : [];
+      out[f.replace(/-config\.json$/, '')] = pets.filter(
+        (p) => p && (p.display === 'desktop' || p.display === 'both'),
+      ).length;
+    } catch {
+      // 坏配置跳过
+    }
+  }
+  return out;
+}
+
+module.exports = {
+  desktopCopyCounts,
+  setPackPetDisplay,
+  nextCopyId,
+  addCopy,
+  removeInstance,
+  copyPetInteractive,
+  deletePetInteractive,
+};
