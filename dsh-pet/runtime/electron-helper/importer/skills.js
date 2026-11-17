@@ -16,8 +16,8 @@ const path = require('node:path');
 
 /** 事件副本后缀：事件里复用的常规动画要换一份不同名的副本（插件按名字判断事件动画，见 importer/plan.js）。 */
 const EVENT_SUFFIX = '·事件';
-/** 工作状态的「工作」档（调用工具中）在 events.workStatus 里的下标，档位共 6 个。 */
-const WORKING_SLOT = 1;
+/** 干活时开打的档位（events.workStatus 下标）：思考 0、调用工具 1、整理结果 2；等待确认 3 仍坐着，完成 / 出错照旧。 */
+const FIGHT_SLOTS = [0, 1, 2];
 const WORK_SLOTS = 6;
 /** 随机放技能时一整套（起手 → 循环 → 收招）的目标时长（秒）；循环遍数按片段长度算，上下浮动一遍 */
 const SKILL_TARGET_SEC = 20;
@@ -207,7 +207,7 @@ function mergeSkillConfig(config, parsed, built, durations = {}) {
   a.categories = cats.filter((c) => c.actions.length);
   // 出场动作：宠物出现在桌面上时先播一次（见 renderer.js），不进随机链
   if (parsed.start && built.has(parsed.start.name)) a.start = [parsed.start.name];
-  // 干活时打：工作状态的「工作」档（Claude Code / Codex / DSH 调用工具中）换成攻击与技能，候选里随机取；
+  // 干活时打：思考 / 调用工具 / 整理结果三档（Claude Code / Codex / DSH 干活的整段）换成攻击与技能，候选里随机取；
   // 技能状态在进行中档位按保持模式播（一直循环到工作结束再收招）。这个包的宠物打开工作状态联动。
   const workPool = [
     ...singles.filter((n) => built.has(n + EVENT_SUFFIX)).map((n) => n + EVENT_SUFFIX),
@@ -219,7 +219,7 @@ function mergeSkillConfig(config, parsed, built, durations = {}) {
     const ws = Array.isArray(events.workStatus) ? events.workStatus.slice() : [];
     const fallback = (a.idle && a.idle[0]) || workPool[0];
     while (ws.length < WORK_SLOTS) ws.push(fallback);
-    ws[WORKING_SLOT] = workPool.length === 1 ? workPool[0] : workPool;
+    for (const i of FIGHT_SLOTS) ws[i] = workPool.length === 1 ? workPool[0] : workPool.slice();
     events.workStatus = ws;
     a.events = events;
     if (Array.isArray(pets)) pets = pets.map((p) => ({ ...p, workStatusEnabled: true }));

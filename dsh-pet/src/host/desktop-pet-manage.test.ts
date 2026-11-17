@@ -124,7 +124,7 @@ test('merging skills wires the working slot and keeps the full skill near 20s', 
     built,
     { '技能3-起手': 1, '技能3-攻击': 5, '技能3-收招': 1 },
   );
-  assert.deepEqual(cfg.animations.events.workStatus[1], ['攻击·事件', '技能3']);
+  for (const i of [0, 1, 2]) assert.deepEqual(cfg.animations.events.workStatus[i], ['攻击·事件', '技能3']);
   assert.equal(cfg.animations.events.workStatus.length, 6);
   assert.equal(cfg.pets[0].workStatusEnabled, true);
   const st = cfg.animations.states.find((s: { name: string }) => s.name === '技能3');
