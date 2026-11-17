@@ -191,9 +191,9 @@ function buildPackConfig({ id, name, built, walks, walkSpeed, extras }) {
     });
 
   const categories = [];
-  if (sitting) categories.push({ id: '坐', weight: 35, actions: ['坐着'] });
+  if (sitting) categories.push({ id: '坐', weight: 37, actions: ['坐着'] });
   if (have('互动')) categories.push({ id: '互动', weight: 7, actions: ['互动'] });
-  if (extraList.length) categories.push({ id: '特别', weight: 3, actions: extraList });
+  if (extraList.length) categories.push({ id: '特别', weight: 1, actions: extraList });
 
   const animations = {
     idle: ['待机'],
