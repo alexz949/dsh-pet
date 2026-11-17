@@ -2,7 +2,7 @@
 
 会话开始时自动拉起 [dsh-pet](https://github.com/alexz949/dsh-pet) 桌宠：用独立模式在后台启动，不需要开 DSH；DSH 里已经有桌宠在跑、或桌宠已经在跑时什么都不做，不会出现第二套。
 
-桌宠不跟着 Claude Code 的工作状态切动作，只按宠物包里设定的概率自己待机、走动、坐着（想要联动的话，宠物配置里打开 `workStatusEnabled`，并自行加上推送状态的 hook，脚本 `scripts/pet.mjs` 支持 `thinking / working / waiting / success / error / idle`）。
+**干活时开打**：Claude Code 调用工具时把「工作中」推给桌宠，结束时回空闲。只有追加过攻击 / 技能动作的干员会响应（右键「追加动作…」会自动打开它的 `workStatusEnabled`）：调用工具期间随机打攻击、放技能，技能一直循环到这一轮结束再收招。其他干员不联动，照旧按概率自己活动。
 
 ## 安装
 
@@ -25,4 +25,4 @@ claude plugin install dsh-pet@dsh-pet
 
 ## 实现
 
-只有一个异步的 `SessionStart` hook（Claude Code 不等它）。脚本不输出、失败也安静退出，不会卡住或打断 Claude Code。排查：`DSH_PET_HOOK_DEBUG=1` → `~/.dsh/dsh-pet/claude-hooks.log`。
+SessionStart 拉起桌宠，UserPromptSubmit / PreToolUse / PostToolUse / PermissionRequest / Stop 等推送工作状态，全部异步（Claude Code 不等它们）。脚本不输出、失败也安静退出，不会卡住或打断 Claude Code。排查：`DSH_PET_HOOK_DEBUG=1` → `~/.dsh/dsh-pet/claude-hooks.log`。

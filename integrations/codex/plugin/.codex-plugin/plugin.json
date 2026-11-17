@@ -1,7 +1,7 @@
 {
   "name": "dsh-pet",
-  "version": "0.2.0",
-  "description": "会话开始时自动拉起 dsh-pet 桌宠（独立模式，不需要开 DSH）；DSH 里已经有桌宠就不再拉起第二套。",
+  "version": "0.3.0",
+  "description": "会话开始时自动拉起 dsh-pet 桌宠（独立模式，不需要开 DSH）；干活时把工作状态推给桌宠，追加了攻击 / 技能动作的干员会在调用工具时开打。",
   "author": {
     "name": "alexz949",
     "url": "https://github.com/alexz949"
@@ -12,8 +12,8 @@
   "keywords": ["desktop-pet", "dsh-pet", "hooks"],
   "interface": {
     "displayName": "dsh-pet 桌宠",
-    "shortDescription": "会话开始时自动拉起桌宠",
-    "longDescription": "会话开始时自动拉起 dsh-pet 桌宠（独立模式，不需要开 DSH）；DSH 里已经有桌宠就不再拉起第二套。",
+    "shortDescription": "自动拉起桌宠，干活时开打",
+    "longDescription": "会话开始时自动拉起 dsh-pet 桌宠（独立模式，不需要开 DSH）；干活时把工作状态推给桌宠，追加了攻击 / 技能动作的干员会在调用工具时开打。",
     "developerName": "alexz949",
     "category": "Productivity"
   }

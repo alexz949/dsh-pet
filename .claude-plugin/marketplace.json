@@ -9,8 +9,8 @@
     {
       "name": "dsh-pet",
       "source": "./integrations/claude-code",
-      "description": "会话开始时自动拉起 dsh-pet 桌宠（独立模式，不需要开 DSH）；DSH 里已经有桌宠就不再拉起第二套。",
-      "version": "0.2.0",
+      "description": "会话开始时自动拉起 dsh-pet 桌宠（独立模式，不需要开 DSH）；干活时把工作状态推给桌宠，追加了攻击 / 技能动作的干员会在调用工具时开打。",
+      "version": "0.3.0",
       "category": "fun",
       "tags": ["desktop-pet", "hooks"]
     }

@@ -96,7 +96,7 @@ async function boot() {
     sprites = [new PetSprite(pet)];
     window.__dshPetDebug.configOk = true;
     window.__dshPetDebug.spriteCount = sprites.length;
-    for (const s of sprites) s.playIdle();
+    for (const s of sprites) s.playEntrance();
     startLoops();
   } catch (e) {
     const msg = '配置加载失败：' + (e && e.message ? String(e.message) : String(e));

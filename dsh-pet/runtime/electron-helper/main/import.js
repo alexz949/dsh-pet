@@ -149,6 +149,8 @@ async function runImport({ files, folderName, petDir, BrowserWindow, ipcMain, on
           walkSpeed,
           extras: parsed.extras.map((x) => x.anim),
         });
+        // 记下源素材的站立身高：之后「追加动作」按同一个缩放对齐，大小不会跳
+        config.importMeta = { standHeightSrc: probe.Relax.box.bottom - probe.Relax.box.top };
         const replaced = writePack(petDir, parsed.id, config, encoded.results);
         return { ok: true, id: parsed.id, name: parsed.name, replaced, anims: built.size, ignored: parsed.ignored };
       })(),
@@ -202,7 +204,7 @@ function writePack(petDir, id, config, results) {
  * 导入进度小窗：屏幕中央一个不抢焦点的小面板，显示「正在导入 xx · 第几段 / 共几段」。
  * 导入要一分钟左右，没有它的话选完文件什么都看不到，像是没反应。
  */
-function openProgress(BrowserWindow, name) {
+function openProgress(BrowserWindow, name, title) {
   const win = new BrowserWindow({
     width: 340,
     height: 104,
@@ -230,9 +232,9 @@ function openProgress(BrowserWindow, name) {
     '.p{box-sizing:border-box;height:100%;padding:14px 18px;border-radius:12px;background:var(--bg);color:var(--fg)}' +
     '.t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.s{color:var(--sub);margin:6px 0 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
     '.k{height:6px;border-radius:3px;background:var(--track);overflow:hidden}.b{height:100%;width:3%;background:var(--bar);transition:width .3s}' +
-    '</style><div class="p"><div class="t">正在导入「' +
-    esc(name) +
-    '」</div><div class="s" id="s">正在读取素材…</div><div class="k"><div class="b" id="b"></div></div></div>';
+    '</style><div class="p"><div class="t">' +
+    esc(title || '正在导入「' + name + '」') +
+    '</div><div class="s" id="s">正在读取素材…</div><div class="k"><div class="b" id="b"></div></div></div>';
   win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
   win.once('ready-to-show', () => {
     if (!win.isDestroyed()) win.showInactive();
@@ -348,4 +350,13 @@ function readPackPets(petDir, id) {
   }
 }
 
-module.exports = { runImport, importPetInteractive, geometryFor };
+module.exports = {
+  runImport,
+  importPetInteractive,
+  geometryFor,
+  openWorker,
+  openProgress,
+  withTimeout,
+  readPackPets,
+  STAND_HEIGHT,
+};

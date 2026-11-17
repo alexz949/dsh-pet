@@ -33,6 +33,7 @@ Object.assign(PetSprite.prototype, {
       // 导入干员：选基建小人的透明 webm，生成新宠物包（主进程做，不需要 ffmpeg）
       { label: '导入干员…', action: 'import-pet' },
       // 这一只：复制（多开一只同样的）/ 隐藏（display=none，托盘勾选叫回）/ 删除（先确认，最后一只进废纸篓）
+      { label: '追加动作…', action: 'append-skills' },
       { label: '复制一只', action: 'copy-pet' },
       { label: '隐藏', action: 'hide-pet' },
       { label: '删除…', action: 'delete-pet' },
@@ -166,6 +167,16 @@ Object.assign(PetSprite.prototype, {
     }
     if (leaf.action === 'copy-pet' || leaf.action === 'delete-pet') {
       this.managePet(leaf.action);
+      return;
+    }
+    if (leaf.action === 'append-skills') {
+      const b = window.petBridge;
+      if (b && typeof b.appendSkills === 'function') {
+        // 名字只取干员名（「维什戴尔·绝对主角」→ 显示全名即可），结果弹窗与重开窗口都由主进程负责
+        b.appendSkills(this.pet.assetRoot || null, this.pet.name).catch((e) =>
+          console.warn('[dsh-pet] 追加动作失败', e),
+        );
+      }
       return;
     }
     if (leaf.action === 'hide-pet') {

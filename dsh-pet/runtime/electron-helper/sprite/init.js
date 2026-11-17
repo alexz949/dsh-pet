@@ -235,12 +235,23 @@ Object.assign(PetSprite.prototype, {
     // 重载（导入干员、改显示位置、重载配置）会重启整个桌面进程，会话内位置跟着丢，所有宠物都跳回
     // 配置角落。刚重启时若有几秒内记下的位置就接着站在原处；正常开机记录早已过期，照旧回角落。
     const saved = this.readSavedPose();
+    this.restoredPose = Boolean(saved);
     if (saved) {
       this.customPos = { rx: saved.rx, ry: saved.ry };
       if (saved.facing === 'left' || saved.facing === 'right') this._facing = saved.facing;
     }
     this.position();
     this.poseSaveTimer = window.setInterval(() => this.savePose(), POSE_SAVE_MS);
+  },
+
+  /**
+   * 窗口刚建好的第一段：配了出场动作（animations.start，如战斗小人的 Start）就先播一次再进随机链；
+   * 重载后接着站在原处的（restoredPose）不再出场，免得每次重载都重新登场一遍。
+   */
+  playEntrance() {
+    const start = Array.isArray(this.animations.start) ? this.animations.start.filter(Boolean) : [];
+    if (start.length && !this.restoredPose) this.playOnce(S.pick(start, ''));
+    else this.playIdle();
   },
 
   /** 同一干员的桌面分身数变了（主进程广播）：重新派生分类权重，正在播的不打断。 */

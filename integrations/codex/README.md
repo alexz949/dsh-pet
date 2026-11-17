@@ -1,6 +1,6 @@
 # dsh-pet for Codex
 
-会话开始时自动拉起 [dsh-pet](https://github.com/alexz949/dsh-pet) 桌宠，和 Claude Code 版一致：用独立模式在后台启动，不需要开 DSH；桌宠已经在跑（独立模式或 DSH 里）时什么都不做。桌宠只按宠物包设定的概率自己活动，不跟工作状态联动。
+会话开始时自动拉起 [dsh-pet](https://github.com/alexz949/dsh-pet) 桌宠，和 Claude Code 版一致：用独立模式在后台启动，不需要开 DSH；桌宠已经在跑（独立模式或 DSH 里）时什么都不做。干活时把工作状态推给桌宠：追加过攻击 / 技能动作的干员会在调用工具时开打，其他干员照旧按概率自己活动。
 
 ## 安装
 
@@ -17,4 +17,4 @@ codex plugin add dsh-pet@dsh-pet
 
 ## 实现
 
-只有一个异步的 `SessionStart` hook，命令用 `$PLUGIN_ROOT` 定位脚本（Codex 在会话目录下用 `$SHELL -lc` 执行 hook）。脚本不输出、失败也安静退出。排查：`DSH_PET_HOOK_DEBUG=1` → `~/.dsh/dsh-pet/codex-hooks.log`。
+SessionStart 拉起桌宠，其余 hook（UserPromptSubmit / PreToolUse / PostToolUse / PermissionRequest / Stop / Interrupt / SessionEnd）推送工作状态，命令用 `$PLUGIN_ROOT` 定位脚本（Codex 在会话目录下用 `$SHELL -lc` 执行 hook）。脚本不输出、失败也安静退出。排查：`DSH_PET_HOOK_DEBUG=1` → `~/.dsh/dsh-pet/codex-hooks.log`。

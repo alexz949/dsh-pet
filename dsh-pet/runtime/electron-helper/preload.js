@@ -75,6 +75,9 @@ contextBridge.exposeInMainWorld('petBridge', {
   copyPet(pack, id) {
     return ipcRenderer.invoke('pet:copy-pet', { pack, id });
   },
+  appendSkills(pack, name) {
+    return ipcRenderer.invoke('pet:append-skills', { pack, name });
+  },
   hidePet(id, display) {
     return ipcRenderer.invoke('pet:hide-pet', { id, display });
   },

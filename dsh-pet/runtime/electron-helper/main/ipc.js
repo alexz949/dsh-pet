@@ -2,6 +2,7 @@
 const path = require('node:path');
 const { BrowserWindow, desktopCapturer, dialog, screen } = require('electron');
 const { importPetInteractive } = require('./import.js');
+const { appendSkillsInteractive } = require('./append.js');
 const { dshHomeDir } = require('./user-data.js');
 const { savePose } = require('./poses.js');
 const { copyPetInteractive, deletePetInteractive, setPackPetDisplay } = require('./manage.js');
@@ -256,6 +257,34 @@ function registerIpc({ ipcMain, petWindows, shell, openTarget, petRoute, onPetsC
     if (r.ok) closeSoon(msg.id);
     return r;
   });
+  // 追加动作：给这个宠物包加攻击 / 技能 / 出场动作，完成后只重开这个包的窗口（读新配置）
+  ipcMain.handle('pet:append-skills', async (event, msg) => {
+    if (importing) return { ok: false, busy: true };
+    importing = true;
+    try {
+      const parent = BrowserWindow.fromWebContents(event.sender) || undefined;
+      const r = await appendSkillsInteractive({
+        dialog,
+        BrowserWindow,
+        ipcMain,
+        petDir: petDirOf(),
+        parent,
+        pack: msg?.pack,
+        name: msg?.name,
+      });
+      if (r.ok) {
+        for (const pet of r.pets) {
+          petWindows.closePet(pet.id);
+          petWindows.openPet(pet.id, pet.size);
+        }
+        changed();
+      }
+      return { ok: r.ok };
+    } finally {
+      importing = false;
+    }
+  });
+
   // 隐藏：宠物包里的实例就地改 display 并关窗；主配置里的宠物（没有包）回落到宿主接口（会整体重建）
   ipcMain.handle('pet:hide-pet', async (_event, msg) => {
     const id = typeof msg?.id === 'string' ? msg.id : '';

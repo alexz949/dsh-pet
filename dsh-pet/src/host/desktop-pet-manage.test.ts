@@ -85,3 +85,49 @@ test('importer config only references animations it built', () => {
   const evs = Object.values(cfg.animations.events).flat();
   for (const name of evs) assert.ok(built.has(name as string), String(name) + ' must exist');
 });
+
+const skills = require('../../runtime/electron-helper/importer/skills.js');
+
+test('skill files: Begin/Loop/Idle/End become a loop state, Start becomes the entrance', () => {
+  const dir = '/d/维什戴尔-绝对主角-正面-';
+  const names = ['Attack_B', 'Skill_1', 'Skill_3_Begin', 'Skill_3_Loop', 'Skill_3_Idle', 'Skill_3_End', 'Start'];
+  const r = skills.parseSkillFiles(
+    names.map((n) => dir + n + '-x1.webm'),
+    new Set(['待机']),
+  );
+  assert.equal(r.ok, true);
+  assert.deepEqual(
+    r.singles.map((s: { name: string }) => s.name),
+    ['攻击B', '技能1'],
+  );
+  assert.equal(r.start.name, '出场');
+  assert.equal(r.states.length, 1);
+  assert.deepEqual(
+    [r.states[0].name, r.states[0].enter, r.states[0].loop, r.states[0].exit],
+    ['技能3', '技能3-起手', ['技能3-攻击', '技能3-架势'], '技能3-收招'],
+  );
+  assert.equal(skills.displayName('Skill_2_Overload'), '技能2·过载');
+});
+
+test('merging skills wires the working slot and keeps the full skill near 20s', () => {
+  const r = skills.parseSkillFiles([
+    '/d/x-正面-Attack-x1.webm',
+    '/d/x-正面-Skill_3_Begin-x1.webm',
+    '/d/x-正面-Skill_3_Loop-x1.webm',
+    '/d/x-正面-Skill_3_End-x1.webm',
+  ]);
+  const { clips } = skills.skillSourcesAndClips(r);
+  const built = new Set<string>(clips.flatMap((c: { names: string[] }) => c.names));
+  const cfg = skills.mergeSkillConfig(
+    { pets: [{ id: 'x', workStatusEnabled: false }], animations: { idle: ['待机'], categories: [], events: {} } },
+    r,
+    built,
+    { '技能3-起手': 1, '技能3-攻击': 5, '技能3-收招': 1 },
+  );
+  assert.deepEqual(cfg.animations.events.workStatus[1], ['攻击·事件', '技能3']);
+  assert.equal(cfg.animations.events.workStatus.length, 6);
+  assert.equal(cfg.pets[0].workStatusEnabled, true);
+  const st = cfg.animations.states.find((s: { name: string }) => s.name === '技能3');
+  assert.deepEqual([st.minLoops, st.maxLoops], [3, 5]);
+  assert.ok(built.has('攻击·事件'), 'event copy for singles used in workStatus');
+});
