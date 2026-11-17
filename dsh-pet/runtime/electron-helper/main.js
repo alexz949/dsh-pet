@@ -48,6 +48,7 @@ const { runSmokeCheck } = require('./main/smoke.js');
 const { createDpi } = require('./main/dpi.js');
 const { createBridge } = require('./main/bridge.js');
 const { createTray } = require('./main/tray.js');
+const { setPackPetDisplay } = require('./main/manage.js');
 const { createWindows } = require('./main/windows.js');
 const { registerIpc } = require('./main/ipc.js');
 const { createDisplaySync } = require('./main/displays.js');
@@ -224,7 +225,21 @@ const petWindows = createWindows({
   taskbarWatchdogEnabled: taskbarWatchdogEnabledFromEnv(process.env.DSH_PET_TASKBAR_WATCHDOG),
 });
 /** 托盘：显示开关与退出入口。 */
+/**
+ * 托盘勾选显示 / 隐藏某只宠物：宠物包里的实例就地改配置、只开 / 关它自己的窗口；
+ * 不是宠物包里的（主配置）返回 false，托盘回落到宿主的 /pet-display（会整体重建）。
+ */
+function setPetDisplayLocal(id, display) {
+  const done = setPackPetDisplay(path.join(dshHomeDir(), 'dsh-pet', 'pet'), id, display);
+  if (!done) return false;
+  if (display === 'desktop' || display === 'both') petWindows.openPet(id, done.size);
+  else petWindows.closePet(id);
+  void tray.refresh();
+  return true;
+}
+
 const tray = createTray({
+  setDisplayLocal: setPetDisplayLocal,
   app,
   Tray,
   Menu,
@@ -301,7 +316,14 @@ app.whenReady().then(() => {
   powerMonitor.on('resume', reassertTaskbar);
   powerMonitor.on('unlock-screen', reassertTaskbar);
 
-  registerIpc({ ipcMain, petWindows, shell, openTarget: OPEN_TARGET, petRoute: PET_ROUTE });
+  registerIpc({
+    ipcMain,
+    petWindows,
+    shell,
+    openTarget: OPEN_TARGET,
+    petRoute: PET_ROUTE,
+    onPetsChanged: () => tray.refresh(),
+  });
   createDisplaySync({ screen, petWindows, dpi });
 
   // 冒烟自检（默认关闭）：DSH_PET_SMOKE=1 时延时截图到 DSH_PET_SMOKE_OUT 后退出，

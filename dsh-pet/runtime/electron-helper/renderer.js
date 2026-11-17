@@ -83,7 +83,7 @@ async function boot() {
       return;
     }
     // 本窗口只承载一只宠物：petIndex 由主进程按 DSH_PET_PETS 顺序注入
-    const pet = pets[CONFIG.petIndex];
+    const pet = (CONFIG.petId && pets.find((p) => p.id === CONFIG.petId)) || pets[CONFIG.petIndex];
     if (!pet) {
       showError('petIndex=' + CONFIG.petIndex + ' 超出桌面宠物列表（共 ' + pets.length + ' 只），本窗口不创建宠物');
       scheduleReboot();

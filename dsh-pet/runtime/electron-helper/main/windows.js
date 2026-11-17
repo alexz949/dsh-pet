@@ -266,9 +266,12 @@ function createWindows({
     win.on('closed', () => {
       stopPointerFallback();
       stopTopmostWatchdog();
-      windows.delete(pet.id);
-      petStates.delete(pet.id);
-      broadcastPetStates();
+      // 同一个 id 可能已经开了新窗口（重新导入时先关后开）：只清自己的登记
+      if (windows.get(pet.id) === win) {
+        windows.delete(pet.id);
+        petStates.delete(pet.id);
+        broadcastPetStates();
+      }
       lastRequestedBounds.delete(win.id);
       winMargins.delete(win.id);
       windowIgnore.delete(win.id);
@@ -292,6 +295,7 @@ function createWindows({
       openTarget,
       scale: String(scale),
       petIndex: String(pet.index),
+      petId: pet.id,
       workAreaW: String(geo.hull.width),
       workAreaH: String(geo.hull.height),
       workAreaX: String(geo.hull.x),
@@ -321,6 +325,28 @@ function createWindows({
   }
 
   /**
+   * 单独开一只（复制 / 托盘叫回）：不动其它窗口。已开着就什么都不做。
+   * DSH_PET_PETS 同步更新，保持「环境里的列表 = 正在显示的宠物」，之后的整体重建也一致。
+   */
+  function openPetWindow(id, size) {
+    if (windows.has(id)) return;
+    const list = petsFromEnv().filter((p) => p.id !== id);
+    list.push({ id, size: Number(size) > 0 ? Number(size) : 462, index: list.length });
+    process.env.DSH_PET_PETS = JSON.stringify(list.map(({ id: pid, size: psize }) => ({ id: pid, size: psize })));
+    const pet = list[list.length - 1];
+    windows.set(id, createPetWindow(pet, deskGeometry(), dpi.petScale()));
+  }
+
+  /** 单独关一只（隐藏 / 删除）：不动其它窗口。 */
+  function closePetWindow(id) {
+    const list = petsFromEnv().filter((p) => p.id !== id);
+    process.env.DSH_PET_PETS = JSON.stringify(list.map(({ id: pid, size }) => ({ id: pid, size })));
+    const win = windows.get(id);
+    windows.delete(id); // 先摘登记：紧接着同 id 重开（重新导入）时不会被当成「已开着」
+    if (win && !win.isDestroyed()) win.destroy(); // 其余按窗口 id 的登记在 closed 事件里清
+  }
+
+  /**
    * 关掉当前全部宠物窗口。
    *
    * 不先关掉的话旧窗口会留在桌面上（Map 里被覆盖的只是引用）。两种模式都调它：应用模式改显示
@@ -346,6 +372,8 @@ function createWindows({
     state: { windows, lastRequestedBounds, winMargins, windowIgnore, inputBusy, inputRegions, offBodyMs, petStates },
     create: createPetWindows,
     closeAll: closeAllPetWindows,
+    openPet: openPetWindow,
+    closePet: closePetWindow,
     geometry: deskGeometry,
     setWindowIgnore,
     updatePetState,

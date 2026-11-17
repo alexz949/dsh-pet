@@ -16,6 +16,7 @@ const path = require('node:path');
  * @param deps.Tray - Electron Tray 构造器。
  * @param deps.Menu - Electron Menu（模板 → 菜单）。
  * @param deps.nativeImage - Electron nativeImage（图标）。
+ * @param deps.setDisplayLocal - 就地改某只宠物的 display 并单开 / 单关窗口；处理了返回 true。
  * @param deps.hostRequest - 与宿主通信（读配置、改 display、请求退出）。
  * @param deps.callbackUrl - bridge 回调地址（建托盘前要等它就绪）。
  * @param deps.isBridge - 是否由宿主以 bridge 模式拉起。
@@ -29,6 +30,7 @@ function createTray({
   Tray,
   Menu,
   nativeImage,
+  setDisplayLocal,
   hostRequest,
   callbackUrl,
   isBridge,
@@ -47,6 +49,8 @@ function createTray({
 
   /** 写回某只宠物的 display：宿主写完配置会重启本进程，响应可能永远不回（同 sprite.js 的 setPetDisplay） */
   function traySetPetDisplay(id, display) {
+    // 宠物包里的实例：主进程就地改配置、只开 / 关这一只（不重启进程，其它宠物不闪）
+    if (typeof setDisplayLocal === 'function' && setDisplayLocal(id, display)) return;
     hostRequest('POST', petRoute + '/pet-display', JSON.stringify({ id, display })).catch((e) => {
       console.error('[dsh-pet-desktop-helper] tray pet-display failed:', String(e && e.message ? e.message : e));
     });

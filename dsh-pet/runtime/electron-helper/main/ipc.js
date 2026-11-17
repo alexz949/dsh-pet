@@ -4,7 +4,7 @@ const { BrowserWindow, desktopCapturer, dialog, screen } = require('electron');
 const { importPetInteractive } = require('./import.js');
 const { dshHomeDir } = require('./user-data.js');
 const { savePose } = require('./poses.js');
-const { copyPetInteractive, deletePetInteractive } = require('./manage.js');
+const { copyPetInteractive, deletePetInteractive, setPackPetDisplay } = require('./manage.js');
 const { decideWindowIgnore } = require('../pointer-target.js');
 /**
  * 渲染端到主进程的 ipc：窗口跟随、飞行状态、碰撞转发、穿透翻转、输入租约与菜单首项（打开软件 / 打开 AI 设置）。
@@ -22,7 +22,7 @@ const { decideWindowIgnore } = require('../pointer-target.js');
  * @param deps.openTarget - 菜单首项的去向：desktop 唤起桌面应用；其余形态交给默认浏览器打开已鉴权地址。
  * @param deps.petRoute - 宠物路由前缀。
  */
-function registerIpc({ ipcMain, petWindows, shell, openTarget, petRoute }) {
+function registerIpc({ ipcMain, petWindows, shell, openTarget, petRoute, onPetsChanged }) {
   // 宠物窗口跟随：renderer 逐帧上报窗口内容区位置/尺寸
   ipcMain.on('pet:set-bounds', (event, bounds) => {
     const win = BrowserWindow.fromWebContents(event.sender);
@@ -198,22 +198,53 @@ function registerIpc({ ipcMain, petWindows, shell, openTarget, petRoute }) {
     try {
       const parent = BrowserWindow.fromWebContents(event.sender) || undefined;
       const petDir = path.join(dshHomeDir(), 'dsh-pet', 'pet');
-      return await importPetInteractive({ dialog, BrowserWindow, ipcMain, petDir, parent });
+      const r = await importPetInteractive({ dialog, BrowserWindow, ipcMain, petDir, parent });
+      // 只开（重新导入则重开）这个干员自己的窗口，其它宠物不动
+      if (r.ok) {
+        for (const pet of r.pets) {
+          if (r.replaced) petWindows.closePet(pet.id);
+          petWindows.openPet(pet.id, pet.size);
+        }
+        if (typeof onPetsChanged === 'function') void onPetsChanged();
+      }
+      return { ok: r.ok };
     } finally {
       importing = false;
     }
   });
 
-  // 复制一只 / 删除（右键菜单）：改宠物包配置；成功后由渲染端请宿主重载。「隐藏」走宿主的 /pet-display。
+  // 复制一只 / 隐藏 / 删除（右键菜单）：改宠物包配置，只开 / 关这一只的窗口（见 manage.js）。
   const petDirOf = () => path.join(dshHomeDir(), 'dsh-pet', 'pet');
+  // 这些操作只动一只：改完配置后单开 / 单关它的窗口，其它宠物不重建；关的是发起请求的窗口本身，
+  // 所以等回执送出去再关。
+  const changed = () => {
+    if (typeof onPetsChanged === 'function') void onPetsChanged();
+  };
+  const closeSoon = (id) =>
+    setTimeout(() => {
+      petWindows.closePet(id);
+      changed();
+    }, 50);
   ipcMain.handle('pet:copy-pet', async (event, msg) => {
     const parent = BrowserWindow.fromWebContents(event.sender) || undefined;
     const mainConfigPath = path.join(dshHomeDir(), 'dsh-pet', 'main-config.jsonc');
-    return copyPetInteractive({ dialog, parent, petDir: petDirOf(), mainConfigPath, pack: msg?.pack, id: msg?.id });
+    const r = await copyPetInteractive({
+      dialog,
+      parent,
+      petDir: petDirOf(),
+      mainConfigPath,
+      pack: msg?.pack,
+      id: msg?.id,
+    });
+    if (r.ok) {
+      petWindows.openPet(r.id, r.size);
+      changed();
+    }
+    return r;
   });
   ipcMain.handle('pet:delete-pet', async (event, msg) => {
     const parent = BrowserWindow.fromWebContents(event.sender) || undefined;
-    return deletePetInteractive({
+    const r = await deletePetInteractive({
       dialog,
       shell,
       parent,
@@ -222,6 +253,16 @@ function registerIpc({ ipcMain, petWindows, shell, openTarget, petRoute }) {
       id: msg?.id,
       name: msg?.name,
     });
+    if (r.ok) closeSoon(msg.id);
+    return r;
+  });
+  // 隐藏：宠物包里的实例就地改 display 并关窗；主配置里的宠物（没有包）回落到宿主接口（会整体重建）
+  ipcMain.handle('pet:hide-pet', async (_event, msg) => {
+    const id = typeof msg?.id === 'string' ? msg.id : '';
+    const hidden = msg?.display === 'web' ? 'web' : 'none';
+    const done = id ? setPackPetDisplay(petDirOf(), id, hidden) : null;
+    if (done) closeSoon(id);
+    return { ok: Boolean(done) };
   });
 
   ipcMain.handle('pet:capture-screen', async (event) => {

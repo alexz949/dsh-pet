@@ -169,7 +169,7 @@ Object.assign(PetSprite.prototype, {
       return;
     }
     if (leaf.action === 'hide-pet') {
-      this.setPetDisplay('none'); // 不删配置：菜单栏托盘里勾上它就回来
+      this.hidePet(); // 不删配置：菜单栏托盘里勾上它就回来
       return;
     }
     if (leaf.action === 'import-pet') {
@@ -418,18 +418,27 @@ Object.assign(PetSprite.prototype, {
   // 一次性启动的（loopsStarted），就地重建会漏启新循环或留下旧定时器。
   // 本请求由即将被重启的进程发出，响应可能永远不回（宿主杀进程时回调地址已失效），故不 await、
   // 不重试，失败只记日志——重载本身就是把本进程换掉。
-  // 导入干员：结果弹窗由主进程负责；导入成功后重载，新宠物随窗口重建出现
+  // 导入干员：结果弹窗与给新干员开窗都由主进程负责
   importPet() {
     if (!window.petBridge || typeof window.petBridge.importPet !== 'function') return;
-    window.petBridge
-      .importPet()
-      .then((r) => {
-        if (r && r.ok) this.reloadDesktop();
-      })
-      .catch((e) => console.warn('[dsh-pet] 导入干员失败', e));
+    // 主进程导入完会自己给新干员开窗，其它宠物不动
+    window.petBridge.importPet().catch((e) => console.warn('[dsh-pet] 导入干员失败', e));
   },
 
-  // 复制一只 / 删除：主进程改配置（删除的确认弹窗也在那边），成功后重载让窗口按新配置重建
+  // 隐藏：桌面位关掉（desktop → none、both → web，浏览器位不动）。宠物包里的由主进程就地关窗；
+  // 主配置里的宠物主进程不处理，回落到宿主接口。
+  hidePet() {
+    const display = this.pet.display === 'both' ? 'web' : 'none';
+    const b = window.petBridge;
+    const local = b && typeof b.hidePet === 'function' ? b.hidePet(this.pet.id, display) : Promise.resolve(null);
+    local
+      .then((r) => {
+        if (!(r && r.ok)) this.setPetDisplay(display);
+      })
+      .catch(() => this.setPetDisplay(display));
+  },
+
+  // 复制一只 / 删除：主进程改配置（删除的确认弹窗也在那边），并只开 / 关这一只的窗口，其它宠物不动
   managePet(action) {
     const b = window.petBridge;
     if (!b) return;
@@ -437,11 +446,7 @@ Object.assign(PetSprite.prototype, {
     const call =
       action === 'copy-pet' ? b.copyPet?.(pack, this.pet.id) : b.deletePet?.(pack, this.pet.id, this.pet.name);
     if (!call) return;
-    call
-      .then((r) => {
-        if (r && r.ok) this.reloadDesktop();
-      })
-      .catch((e) => console.warn('[dsh-pet] ' + action + ' 失败', e));
+    call.catch((e) => console.warn('[dsh-pet] ' + action + ' 失败', e));
   },
 
   reloadDesktop() {

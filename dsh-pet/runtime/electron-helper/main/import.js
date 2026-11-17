@@ -330,9 +330,22 @@ async function importPetInteractive({ dialog, BrowserWindow, ipcMain, petDir, pa
     ' 段动画。' +
     (missing.length ? '\n没有的动作：' + missing.join('、') + '（对应功能会少一些）。' : '') +
     (result.ignored.length ? '\n没用上的文件：' + result.ignored.join('、') : '') +
-    '\n桌宠会重新加载，新干员出现在屏幕右上方。';
+    '\n新干员会出现在屏幕右上方。';
   await dialog.showMessageBox(parent, { type: 'info', message: '「' + result.name + '」导入好了', detail });
-  return { ok: true, id: result.id };
+  const pets = readPackPets(petDir, result.id);
+  return { ok: true, id: result.id, replaced: result.replaced, pets };
+}
+
+/** 包里显示在桌面上的实例（导入后由主进程逐个开窗）。 */
+function readPackPets(petDir, id) {
+  try {
+    const config = JSON.parse(fs.readFileSync(path.join(petDir, id + '-config.json'), 'utf8'));
+    return (Array.isArray(config.pets) ? config.pets : [])
+      .filter((p) => p && (p.display === 'desktop' || p.display === 'both'))
+      .map((p) => ({ id: p.id, size: p.size }));
+  } catch {
+    return [];
+  }
 }
 
 module.exports = { runImport, importPetInteractive, geometryFor };
