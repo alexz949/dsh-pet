@@ -2,7 +2,7 @@
 
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的桌面宠物插件。基于 **[PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet)**（MIT，保留原作者版权与许可证），做了一轮减负与流畅度改进。
 
-**本 fork 不内置任何角色**：原作者那只 AI 生成的默认角色（动画、表情包、参考图、预览图）已全部移除。宠物由你自己的**宠物包**（pet pack：一份配置 + 一组透明动画）提供，放进 `$DSH_HOME/dsh-pet/pet/` 即可，做法见 [MAKE-YOUR-OWN-PET.md](MAKE-YOUR-OWN-PET.md) 与 [CONFIG.md](CONFIG.md) 的「额外宠物（pet pack）」。
+**本 fork 不内置任何角色**：原作者那只 AI 生成的默认角色（动画、表情包、参考图、预览图）已全部移除。宠物由你自己的**宠物包**（pet pack：一份配置 + 一组透明动画）提供，放进 `$DSH_HOME/dsh-pet/pet/` 即可。最省事的是右键桌宠 →「导入干员…」（见下面[导入干员](#导入干员一键做宠物包)）；自己做素材见 [MAKE-YOUR-OWN-PET.md](MAKE-YOUR-OWN-PET.md) 与 [CONFIG.md](CONFIG.md) 的「额外宠物（pet pack）」。
 
 ## 相对原版的改动
 
@@ -12,6 +12,8 @@
 - **漫游范围** `moves.default.wanderRange`：在「家」附近来回溜达，走远 / 撞边就转身
 - **没人理自己睡** `pets[].autoSleepMinutes`，DSH 再干活时自己醒
 - **精简右键菜单**：常用项一层，其余收进「更多」；动作少的宠物不分组、去重，走法合并成一项
+- **导入干员**：右键 →「导入干员…」，选基建小人的透明 webm 就自动生成宠物包（不需要 ffmpeg）
+- **重载不挪位**：导入、重载配置、改显示位置之后宠物留在原处，不再全部跳回角落
 - 点击不再 Q 弹、默认不出声；macOS 桌面端优先用 HEVC 透明 `.mov` 硬件解码（约省 30% CPU）
 
 ## 配合 Claude Code / Codex 使用
@@ -87,6 +89,16 @@ dsh plugin --profile desktop add ../release/dsh-pet-<版本>.tgz
 - **无头 / 无桌面环境**：支持 Linux headless 等无图形会话——桌面模式自动检测显示环境（Linux 无 `DISPLAY` / `WAYLAND_DISPLAY` 时判定无显示、跳过桌面窗口，仅日志告警），浏览器 overlay 不受影响
 - **浏览器**：浏览器 overlay 兼容 **Chromium 内核（Chrome / Edge 等）与 Firefox**——透明动画依赖 VP9-Alpha webm，三者均已实测透明确认；**不支持 Safari**（macOS 不认 webm alpha，透明渲染为黑底）——macOS 用 `.mov` 素材（GitHub Release `assets-mov`），下载放入即可（见「②.5 Safari/HEVC 兼容素材」）
 - **多显示器**：支持多屏环境——跨屏漫游/抛掷以各屏工作区为界，异构缩放（各屏 DPI 不同）、任务栏条带、屏幕之间空洞均正确判定（横屏 / 竖屏 / 上下叠放皆可）；设置页「锁定在当前屏幕」可让宠物（抛掷与漫游）只在当前所在那块屏内活动
+
+## 导入干员（一键做宠物包）
+
+右键桌宠 →「**导入干员…**」，选明日方舟基建小人的透明 webm（可以多选文件，也可以直接选放它们的文件夹）→「导入」。屏幕中间会出一个进度面板，大约一分钟做完，桌宠自动重载，新干员出现在屏幕右上方。
+
+- **素材**：从 PRTS 下载的基建小人 webm，文件名原样即可（如 `乌尔比安-注目深渊-基建-Relax-x1.webm`），也认 `Relax.webm` 这种短名。动作按文件名里的 `Relax`（待机，必需）/ `Move` / `Interact` / `Sit` / `Sleep` / `Special` 认，Special 有几个加几个，缺哪个就少哪段。**只收本身带透明背景的 webm**，gif 和不透明的视频不行（不会自动抠图）。素材需要你自己准备，本仓库不附带。
+- **自动做的事**：从透明通道量出身高、脚底与坐下 / 睡觉的地面线并对齐、翻转朝向、按 30fps 重新编码；生成待机、转身、三种长度的走路、互动、坐着、睡觉、特别动作；走路速度从脚步自动测（脚不打滑）；动作概率用空弦 / 乌尔比安调好的默认值。
+- **不需要 ffmpeg**：解码、对齐、编码都在插件自带的 Electron 里做（WebCodecs；彩色与透明各编一路 VP9，再拼成透明 webm）。
+- **结果**：写在 `$DSH_HOME/dsh-pet/pet/<id>-config.json` 与 `<id>-animation/`。名字取自文件名（「乌尔比安·注目深渊」），中文名的 id 是 `op-` 加一串短哈希。同一个干员再导入一次就是覆盖更新，大小、位置等设置保留。想微调（大小、权重、走路距离…）直接改那份配置，字段见 [CONFIG.md](CONFIG.md)「额外宠物（pet pack）」。
+- **限制**：只出 webm，macOS 上没有省电的 HEVC `.mov`（CPU 略高）；文件比 ffmpeg 编出来的大一些（一个干员约 5–20 MB）。
 
 ## 从零生成你自己的宠物
 
