@@ -96,6 +96,32 @@ export function buildMoreBranch(items: readonly MenuMoreItem[]): MenuBranch | nu
   return children.length > 0 ? { label: MORE_MENU_LABEL, children } : null;
 }
 
+/**
+ * 精简版右键菜单：常用项放第一层，其余（含第三方项）全收进一个「更多」。
+ *
+ * 第一层 = primary（对话 / 待办 / 睡觉这类）+ 动作树；rare = 不常点的工具与维护项
+ * （打开软件、余额、天气、碎碎念、配图、显示位置、重载、回到初始位置）。第三方「更多」的子项
+ * 接在 rare 后面合成同一个「更多」，不会出现两个。两端（桌面 / 网页）共用，排法不会漂移。
+ * @param o.primary - 第一层的工具项。
+ * @param o.actions - 动作树（buildMenuTree 的结果）。
+ * @param o.rare - 收进「更多」的项。
+ * @param o.thirdParty - buildMoreBranch 的结果；没有第三方项为 null。
+ * @returns 整棵菜单树。
+ */
+export function buildCompactMenu(o: {
+  primary: readonly MenuNode[];
+  actions: readonly MenuNode[];
+  rare: readonly MenuNode[];
+  thirdParty: MenuBranch | null;
+}): MenuNode[] {
+  const moreChildren: MenuNode[] = [...o.rare, ...(o.thirdParty ? o.thirdParty.children : [])];
+  return [
+    ...o.primary,
+    ...o.actions,
+    ...(moreChildren.length > 0 ? [{ label: MORE_MENU_LABEL, children: moreChildren }] : []),
+  ];
+}
+
 /** 事件名 → 分类标签（无映射时用事件名本身）。 */
 const EVENT_LABELS: Record<string, string> = {
   balance: '余额档位',
@@ -106,34 +132,78 @@ const EVENT_LABELS: Record<string, string> = {
 /** 把动画名包成叶子。 */
 export const leaf = (anim: string): MenuLeaf => ({ label: anim, anim });
 
-/** 由成品 animations 配置推导菜单树：一级「动作」→ 二级分类 → 三级动画名；空池与空分类自动省略。 */
-export function buildMenuTree(animations: Animations): MenuNode[] {
-  const groups: MenuNode[] = [];
-  const pools: Array<[string, string[]]> = [
-    ['待机', animations.idle],
-    ['转向', animations.turn],
-    ['拖拽', animations.drag],
-    ['点击回应', animations.clicks],
-    ['移动', animations.moves.actions.map((m) => m.name)],
-  ];
-  for (const [label, pool] of pools) {
-    if (pool.length) groups.push({ label, children: pool.map(leaf) });
+/** 动作不多于这个数时「动作」菜单不分组、直接平铺（只算非事件的动作，去重后）。 */
+export const FLAT_MENU_MAX = 10;
+
+/**
+ * 移动动作合并：同一种走法的几种长度（`走路` / `走路-短` / `走路-长`…）在菜单里只占一项。
+ * 名字去掉末尾的 `-xxx` 后相同就算一种；叶子标签用去掉后缀的名字，点播时从几种长度里随机取一个
+ * （每次打开菜单重新抽，菜单树本身不缓存）。
+ * @param names - moves.actions 的名字，保持配置顺序。
+ */
+export function mergeMoveVariants(names: readonly string[], roll: () => number = Math.random): MenuLeaf[] {
+  const base = (n: string): string => n.replace(/-[^-]+$/, '');
+  const groups = new Map<string, string[]>();
+  for (const n of names) {
+    const b = base(n);
+    const list = groups.get(b) ?? [];
+    list.push(n);
+    groups.set(b, list);
   }
+  const out: MenuLeaf[] = [];
+  for (const [b, list] of groups) {
+    if (list.length === 1) out.push(leaf(list[0]));
+    else out.push({ label: b, anim: list[Math.floor(roll() * list.length)] });
+  }
+  return out;
+}
+
+/**
+ * 由成品 animations 配置推导菜单树：一级「动作」→ 二级分类 → 三级动画名；空池与空分类自动省略。
+ *
+ * - 去重：同一个动画在多个池子里出现（点击回应也是随机动作、事件档位复用常规动作…）只列第一次。
+ * - 移动的几种长度合并成一项（mergeMoveVariants）。
+ * - 动作少（非事件动作去重后 ≤ FLAT_MENU_MAX）就不分组，平铺成一列，并且不列事件专用的动画——
+ *   素材只有十来个的角色，按用途分组只会是一堆重复项。动作多的宠物照旧分组。
+ */
+export function buildMenuTree(animations: Animations): MenuNode[] {
+  const seen = new Set<string>();
+  const fresh = (leaves: MenuLeaf[]): MenuLeaf[] =>
+    leaves.filter((l) => {
+      const anim = l.anim ?? l.label;
+      if (seen.has(anim) || seen.has(l.label)) return false;
+      seen.add(anim);
+      seen.add(l.label);
+      return true;
+    });
+  const groups: MenuBranch[] = [];
+  const pools: Array<[string, MenuLeaf[]]> = [
+    ['待机', animations.idle.map(leaf)],
+    ['转向', animations.turn.map(leaf)],
+    ['拖拽', animations.drag.map(leaf)],
+    ['点击回应', animations.clicks.map(leaf)],
+    ['移动', mergeMoveVariants(animations.moves.actions.map((m) => m.name))],
+  ];
   // 随机动作分类：noMirror 分类照样可点播，播放端朝右时强制朝左（见 isNoMirrorAnimation）
-  const cats = (animations.categories ?? []).filter((c) => c.actions.length > 0);
-  for (const c of cats) {
-    groups.push({ label: c.id, children: c.actions.map(leaf) });
+  for (const c of animations.categories ?? []) pools.push([c.id, c.actions.map(leaf)]);
+  for (const [label, pool] of pools) {
+    const children = fresh(pool);
+    if (children.length) groups.push({ label, children });
+  }
+  const regularCount = groups.reduce((n, g) => n + g.children.length, 0);
+  if (regularCount > 0 && regularCount <= FLAT_MENU_MAX) {
+    return [{ label: '动作', children: groups.flatMap((g) => g.children) }];
   }
   // 事件动画：每个事件一个分类，不来自随机链；数组槽位展平为逐个叶子，候选都可点播预览。
   const events = animations.events ?? {};
   for (const key of Object.keys(events)) {
-    const pool = events[key] ?? [];
     const names: string[] = [];
-    for (const slot of pool) {
+    for (const slot of events[key] ?? []) {
       if (typeof slot === 'string') names.push(slot);
       else names.push(...slot);
     }
-    if (names.length) groups.push({ label: EVENT_LABELS[key] ?? key, children: names.map(leaf) });
+    const children = fresh(names.map(leaf));
+    if (children.length) groups.push({ label: EVENT_LABELS[key] ?? key, children });
   }
   if (!groups.length) return [];
   return [{ label: '动作', children: groups }];

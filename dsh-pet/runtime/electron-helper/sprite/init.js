@@ -57,6 +57,8 @@ Object.assign(PetSprite.prototype, {
     this.moveToken = 0;
     this.pendingMove = null;
     this.customPos = null; // 拖拽后的会话内位置（{rx, ry} 比例）；restart 回角落
+    // 漫游范围（moves.default.wanderRange）：家 = 最近一次被放下的位置，见 shared/motion 的 WanderState
+    this.wander = { home: null, lastWalkX: null };
   },
 
   /** 菜单、气泡、提示、余额、碎碎念、工作状态、占用锁与对话弹窗的开关状态。 */
@@ -112,6 +114,18 @@ Object.assign(PetSprite.prototype, {
     this.sleeping = false;
     this.sleepSet = null;
     this.sleepPhase = null;
+    // 循环状态（animations.states）：loopRun = 进行中记录（见 shared/loop-states），null = 不在状态里。
+    // loopInternal = 这次换源是状态机自己发起的；其余任何换源（点击 / 拖拽 / 菜单 / 事件 / 睡觉）都视为打断。
+    // 预载（armPreroll）：preroll = 提前收尾、还在播最后零点几秒的那一段，下一段等它播完再开播。
+    this.loopRun = null;
+    // 没人理就自己睡（pets[].autoSleepMinutes）：lastActiveAt = 最近一次「有人理」的时刻，
+    // autoSlept = 这次睡着是自己睡的（DSH 再次干活时自己醒；手动哄睡的不受影响）。
+    this.lastActiveAt = Date.now();
+    this.autoSlept = false;
+    this.loopInternal = false;
+    // 保持中的状态被别的动画请求打断时，那次请求先挂在这里，等退出段（站起来）播完再播
+    this.afterLoopExit = null;
+    this.preroll = null;
     // 对话弹窗：当前挂载句柄（close / startHear / stopHear）+ 开启标记。chatOpen 是穿透守卫——
     // 弹窗是窗口内 DOM，期间整窗保持可交互，否则光标移到输入框就会被 onMouseMove 翻回穿透、点击全被透传。
     this.chatMount = null;

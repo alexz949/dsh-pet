@@ -9,6 +9,7 @@ export type { ContextMenuMount, MenuBranch, MenuLeaf, MenuMoreItem, MenuNode } f
 export type { MemeGroups, MemeGroupSource } from './menu/memes.ts';
 export {
   MORE_MENU_LABEL,
+  buildCompactMenu,
   buildMenuTree,
   buildMoreBranch,
   displayMenuBranch,

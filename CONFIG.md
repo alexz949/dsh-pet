@@ -128,6 +128,13 @@ $DSH_HOME/dsh-pet/
 - **素材只查自己的**：素材目录名 = 文件名前缀（`pet/pig-config.json` → `pet/pig-animation/`），该种类所有实例共用；动画 URL `/thumb/<前缀>/<名>.webm`，查不到即 404——绝不落到 `main-animation` 或包内素材
 - **动画池不回落全局**：`animations` / `animationWeights` 必须写全（缺失即配置错误）
 - **`animations.sleep` 是可选段**（睡觉动作）：不写 = 该种类没有睡觉功能，右键菜单不出现「睡觉」，其余动画不受影响。写了就是「套」的数组，每套 `{ start, loop, end }` 三段各是候选数组；入睡时整套随机挑一套，三段都从这套里取，进段时再在段内随机挑一个（避开刚播完的那个）。结构见包内 `assets/config.jsonc` 的 `sleep` 注释
+- **`animations.states` 是可选段**（循环状态：坐下坐一会儿再起来这类「进入 → 循环若干遍 → 退出」的动作）：每项 `{ name, enter, loop, exit, minLoops, maxLoops }`，三段各是非空候选数组，循环遍数在 `[minLoops, maxLoops]` 里随机（整数，`minLoops ≥ 0`）。`name` 是状态名、不对应素材文件：把它写进 `categories` 的 `actions` 就进随机链，菜单点播、`/anim` 与对话联动同理；播放端识别到状态名就改播进入段，循环段每遍重抽（避开刚播完的），退出段播完回随机链。期间被点击 / 拖拽 / 事件等别的动画顶掉，状态即作废。与睡觉的区别：不等人叫醒，自己退出。**保持模式**：状态写进 `events.workStatus` 的进行中档位（如「等你确认」）时按循环来播——进入后一直循环、不计遍数，直到工作状态变化 / 回空闲 / 被点击等别的动画要播，届时先播退出段（站起来）再播那个动画。
+  ```jsonc
+  "categories": [{ "id": "小动作", "weight": 30, "actions": ["坐着", "互动"] }],
+  "states": [{ "name": "坐着", "enter": ["坐下-开始"], "loop": ["坐下-循环"], "exit": ["坐下-起来"], "minLoops": 1, "maxLoops": 3 }]
+  ```
+- **`animations.moves.default.wanderRange`（可选）漫游半径**：宠物以「家」（最近一次被拖拽 / 抛掷 / 回到初始位置放下的地方）为中心，左右各走这么远（基准宠物宽 462px 下的像素，按 size 缩放）。随机链的下一步会走出范围、或被屏幕边挡住时，改播转身再往回走——于是一直在家附近来回溜达。不写 / `0` = 原行为（越界退回原地动作）。菜单点播的走位不受限。
+- **`pets[].autoSleepMinutes`（可选，实例级）没人理多少分钟后自己去睡**：缺省 / `0` = 关闭。「有人理」= 点 / 拖 / 右键宠物、打开对话、DSH 开始干活（工作状态进入非终态）。到点走与右键「睡觉」同一个请求；自己睡着的宠物在 DSH 再次干活时自己醒，手动哄睡的照旧点一下才醒。需要该条目配了 `animations.sleep`。
 - **睡觉文案按种类各写一份**：`sleepStartTexts` / `sleepEndTexts` / `sleepRefuseTexts`，不写就跟随内置那份；`eventsRefreshSec.sleepTalk` 是梦话周期（秒，默认 60）
 - 与主配置同构的约束：`pets` 每只字段完整合法、数组内 id 唯一、`animations` / `animationWeights` 结构校验同一套规则；`notificationsEnabled` / `eventsRefreshSec` 是全局属性，不归宠物文件管（写了忽略、不写不报错）
 - 配置非法 / 缺少 `-animation/` 目录 / 实例 id 与主宠物冲突 → 加载时显式报错并跳过（不影响其他宠物）

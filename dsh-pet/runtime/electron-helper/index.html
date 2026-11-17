@@ -49,8 +49,13 @@
         height: 100%;
         object-fit: contain;
         pointer-events: none;
-        opacity: 0;
-        transition: opacity 0.18s ease;
+        /* 后台那个视频不完全透明，留 1%：完全透明时 Chromium 不把它的画面送进合成层，
+           换段把它翻到前台的第一帧还是空的，透明窗口会整只宠物消失一帧（60fps 录屏实测）。
+           1% 在任何底色上都只差两三个色阶，看不出来。 */
+        opacity: 0.01;
+        /* 换段是硬切：新段首帧真正出画后同一刻互换（见 sprite/playback.js 的 presentSwap）。
+           不做透明度过渡——两层半透明叠加时整只宠物会变淡一下，站着不动时尤其明显。 */
+        transition: none;
       }
       /* 1/255 修正：WebM 的「透明」背景实测 alpha 恒为 1/255（109 个素材逐一验证），Chromium 按
          0.4% 不透明度合成，浅色底上就是一层淡灰矩形；扣掉一档即精确归零。开关是共享常量
@@ -60,6 +65,7 @@
       }
       video.pet-video.is-front {
         opacity: 1;
+        z-index: 1;
       }
       .pet-hit {
         position: absolute;

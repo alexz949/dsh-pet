@@ -5,6 +5,7 @@
  * 不变量：每次渲染重新绑定；消费方不得缓存整个 hub，只能在调用点取值。
  * @module dsh-pet/src/client/pet/card/hub
  */
+import type { WalkResult } from '../motion/walk.ts';
 import type { CardStateApi } from './state.ts';
 import type { OwnAnimation } from '../animation/animation.ts';
 import type { BubbleSlots } from './bubble-slots.ts';
@@ -39,7 +40,7 @@ export interface CardHub {
   /** 抛掷指令：角度（度，0 为正右、逆时针为正）与力度倍率。 */
   applyThrow(angleDeg: number, power: number): void;
   /** 试发起一次自主走位：占用中返回 true，无法移动返回 false，成功返回动作名。 */
-  tryWalk(): boolean | string;
+  tryWalk(): WalkResult;
   /** 依据名点播。 */
   playByName: PlayByName;
   /** 说一句。 */

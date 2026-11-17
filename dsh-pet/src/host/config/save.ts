@@ -10,6 +10,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { CORNER_SET, isValidPetId, PET_DISPLAY_SET } from './constants.ts';
 import { isValidSizePercent } from '../../shared/pet-size.ts';
+import { isValidAutoSleepMinutes } from '../../shared/auto-sleep.ts';
 import type { ConfigPaths } from './constants.ts';
 import { fontValid, modelSelectionValid, physicsValid, topFieldValid } from './validate.ts';
 import type { MemoryConfig } from '../../shared/memory.ts';
@@ -59,6 +60,10 @@ export function saveUserConfig(
     // 传了必须是布尔，没传则走下面的读取侧默认值（内置默认 false = 不固定）。
     const fixedEnabled = pp.fixedEnabled;
     if (fixedEnabled !== undefined && typeof fixedEnabled !== 'boolean') return null;
+    // 没人理就自己睡（可选）：传了必须是 ≥0 的数字，0 = 关闭（不落键）
+    const autoSleepMinutes = pp.autoSleepMinutes;
+    if (autoSleepMinutes !== undefined && autoSleepMinutes !== null && !isValidAutoSleepMinutes(autoSleepMinutes))
+      return null;
     const display = String(pp.display ?? '');
     if (!PET_DISPLAY_SET.has(display)) return null;
     const pos = pp.position && typeof pp.position === 'object' ? (pp.position as Record<string, unknown>) : {};
@@ -87,6 +92,7 @@ export function saveUserConfig(
     };
     if (persona) pet.whisperPrompt = persona;
     if (sizePercent !== undefined && sizePercent !== null) pet.sizePercent = sizePercent;
+    if (typeof autoSleepMinutes === 'number' && autoSleepMinutes > 0) pet.autoSleepMinutes = autoSleepMinutes;
     out.push(pet);
   }
   const ne = o.notificationsEnabled;

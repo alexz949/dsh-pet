@@ -285,3 +285,86 @@ describe('createOwnAnimation —— 播完与冻结', () => {
     assert.deepEqual(h.loader.released, ['blob:1']);
   });
 });
+
+describe('createOwnAnimation —— 循环状态', () => {
+  const withStates = {
+    ...animations,
+    states: [{ name: '坐着', enter: ['sit-in'], loop: ['sit-loop'], exit: ['sit-out'], minLoops: 2, maxLoops: 2 }],
+  } as unknown as Animations;
+  const cfg = () => ({ id: 'pet-1', assetRoot: 'duck', animations: withStates });
+
+  /** 让最近一次换源完成：交付 blob 并在对应槽位派发 loadeddata。 */
+  const finishLoad = (h: ReturnType<typeof harness>, blob: string): string => {
+    const req = h.loader.requests[h.loader.requests.length - 1];
+    req.handlers.onObjectUrl(blob);
+    const el = h.videoA.src === blob ? h.videoA : h.videoB;
+    el.fire('loadeddata');
+    return req.url;
+  };
+
+  test('状态名换成进入段；ended 依次推进 进入 → 循环 ×2 → 退出，退出播完交回随机链', () => {
+    const h = harness({ cfg });
+    h.anim.switchTo('坐着', true, null);
+    const played = [finishLoad(h, 'blob:0')];
+    const cues: string[] = [];
+    for (let i = 1; i <= 3; i++) {
+      cues.push(h.anim.handleEnded().kind);
+      played.push(finishLoad(h, 'blob:' + i));
+    }
+    cues.push(h.anim.handleEnded().kind);
+    assert.deepEqual(
+      played.map((u) => decodeURIComponent(u.split('/').pop() ?? '').replace(/\.\w+$/, '')),
+      ['sit-in', 'sit-loop', 'sit-loop', 'sit-out'],
+    );
+    // 状态内部推进组件什么都不用做（ignore），退出播完才回 random
+    assert.deepEqual(cues, ['ignore', 'ignore', 'ignore', 'random']);
+  });
+
+  const lastName = (h: ReturnType<typeof harness>): string => {
+    const u = h.loader.requests[h.loader.requests.length - 1].url;
+    return decodeURIComponent(u.split('/').pop() ?? '').replace(/\.\w+$/, '');
+  };
+
+  test('当循环播（工作状态进行中）= 保持：一直循环；别的动画来了先播退出段再播它', () => {
+    const h = harness({ cfg });
+    h.anim.switchTo('坐着', false, null);
+    finishLoad(h, 'blob:0');
+    for (let i = 1; i <= 5; i++) {
+      assert.equal(h.anim.handleEnded().kind, 'ignore');
+      assert.equal(lastName(h), 'sit-loop', '保持中一直循环');
+      finishLoad(h, 'blob:' + i);
+    }
+    h.anim.switchTo('坐着', false, null); // 同一状态再被请求：原样保持，不重新取素材
+    const before = h.loader.requests.length;
+    assert.equal(h.loader.requests.length, before);
+    h.anim.switchTo('click1', true, null); // 别的动画：先站起来
+    assert.equal(lastName(h), 'sit-out');
+    finishLoad(h, 'blob:out');
+    assert.equal(h.anim.handleEnded().kind, 'ignore');
+    assert.equal(lastName(h), 'click1', '退出段播完才播挂起的那个');
+  });
+
+  test('保持中回空闲（stopLoopingFront）：站起来，站完回随机链', () => {
+    const h = harness({ cfg });
+    h.anim.switchTo('坐着', false, null);
+    finishLoad(h, 'blob:0');
+    h.anim.handleEnded();
+    finishLoad(h, 'blob:1');
+    h.anim.stopLoopingFront();
+    assert.equal(lastName(h), 'sit-out');
+    finishLoad(h, 'blob:out');
+    assert.equal(h.anim.handleEnded().kind, 'random');
+  });
+
+  test('被外部换源打断：之后的 ended 不再推进状态', () => {
+    const h = harness({ cfg });
+    h.anim.switchTo('坐着', true, null);
+    finishLoad(h, 'blob:0');
+    h.anim.switchTo('click1', true, null); // 点击回应顶掉了进入段
+    finishLoad(h, 'blob:1');
+    const before = h.loader.requests.length;
+    h.setCurrentAnim('click1');
+    assert.equal(h.anim.handleEnded().kind, 'interaction-done');
+    assert.equal(h.loader.requests.length, before, '不该再去加载状态的循环段');
+  });
+});

@@ -57,7 +57,7 @@ export function createCardDrag(rt: CardDragRuntime) {
   const { useRef, useEffect } = rt;
 
   return function useCardDrag(input: CardDragInput): Drag {
-    const { bumpSeq, card, cfgRef, live, motion, pendingSquash, root, setAnim, setCustomPos } = input;
+    const { bumpSeq, card, cfgRef, live, motion, root, setAnim, setCustomPos } = input;
     const { setOnce, setTipOn } = input;
 
     // 拖拽驱动每次事件取的当帧能力：逐渲染重建，驱动长期持有这个 getter。
@@ -78,9 +78,9 @@ export function createCardDrag(rt: CardDragRuntime) {
         setOnce: (on) => setOnce(on),
         playAnim: (name) => setAnim(name),
         bumpSeq: () => bumpSeq(),
-        markSquash: () => {
-          pendingSquash.current = true;
-        },
+        // 点击不再做 Q 弹挤压：挤压只作用在新段上，换段垫底期间会和下面的旧段叠出重影。
+        // 留着这个钩子（拖拽状态机按约定调用它），什么都不做；抛掷落地的挤压在 motion.ts，照旧。
+        markSquash: () => {},
         resumeWork: () => live.current.flow?.resumeWorkStatusAnim() ?? false,
         stopAutonomy: () => motion.stopMove(),
         stopFlight: () => motion.flight.stop(),

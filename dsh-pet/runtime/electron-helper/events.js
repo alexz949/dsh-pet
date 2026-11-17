@@ -27,6 +27,8 @@ PetSprite.prototype.onWorkTick = function onWorkTick(snapshot, tick) {
   const stateChanged = this.prevWorkState !== state;
   this.prevWorkState = state;
   if (!state) {
+    // 回空闲：保持中的状态（等确认时坐着）先站起来，站完回随机链
+    if (!this.sleeping && this.loopRun && this.loopRun.hold) this.releaseHeldState();
     // 回空闲：把正在循环播的进行中档位动画改成「播完即停」。进行中档位走 switchTo(name, false)
     // （loop=true），正常不触发 ended；这里不切动画，链就拿不到推进信号，
     // 宠物会卡在那段工作动画上。只改当前段：它结束后走 handleEnded → playIdle。
@@ -392,6 +394,8 @@ function applyWorkStatusLeaf(leaf) {
   const snap = S.toWorkStatus(leaf.data);
   if (!snap) return;
   workTick++;
+  // 主人开始忙：计入「有人理」，自己睡着的宠物自己醒（在睡着跳过之前处理）
+  for (const s of sprites) s.noteWorkActivity(snap.state);
   // 睡着不看不听：自动来源的工作状态整条跳过（动画与气泡都不更新），醒来后的下一次状态变化重新对齐
   for (const s of sprites) if (!s.sleeping) s.onWorkTick(snap, workTick);
 }
@@ -552,4 +556,9 @@ function startLoops() {
     setTimeout(() => void stateLoop(), hit && stateLongPoll ? 0 : 1000);
   };
   void stateLoop();
+
+  // 没人理就自己睡（pets[].autoSleepMinutes）：分钟级阈值，定时判定即可
+  setInterval(() => {
+    for (const s of sprites) s.checkAutoSleep();
+  }, S.AUTO_SLEEP_CHECK_MS);
 }

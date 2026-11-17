@@ -21,6 +21,7 @@ import { bindOpenChat } from './open-chat.ts';
 import { registerPetChatHandle } from './registry.ts';
 import {
   buildMemeBranch,
+  buildCompactMenu,
   buildMenuTree,
   buildMoreBranch,
   displayMenuBranch,
@@ -336,8 +337,9 @@ export function createCardEntry(rt: CardEntryRuntime) {
 
     /** 打开右键菜单。 */
     const handleContextMenu = (e: ReactNS.MouseEvent<HTMLDivElement>): void => {
-      // 工具项与动作树；「查看余额」无条件显示，手动请求不受开关限制。
-      // 第三方菜单项统一收在「更多」下：label 唯一的平铺，重名的按 owner 分子菜单（见 buildMoreBranch）。
+      // 精简菜单（见 shared/menu/tree 的 buildCompactMenu）：第一层只放对话 / 待办 / 睡觉 + 动作树，
+      // 其余工具与维护项收进「更多」；第三方菜单项接在「更多」末尾（label 唯一平铺，重名按 owner 分子菜单）。
+      // 「查看余额」无条件显示，手动请求不受开关限制。
       const more = buildMoreBranch(menuItemsRef.current);
       // 「配图」：按配置里的清单分成「纳入对话的配图 / 其他」，点一张就用它说一句。
       // 没有可用图时返回 null，整项不出现（不占一个点开是空的菜单）。
@@ -351,28 +353,25 @@ export function createCardEntry(rt: CardEntryRuntime) {
       const sleepItem: MenuNode = asleep
         ? { label: '起来', action: 'wake', hint: SLEEP_HOTKEY_HINT }
         : { label: '睡觉', action: 'sleep', hint: SLEEP_HOTKEY_HINT };
-      // 顺序与桌面端同一排法：余额 / 待办 / 碎碎念 / 对话 / 配图 / 睡觉 → 动作树 → 显示位置 / 回到初始位置。
-      // 桌面专属的两项（打开软件、重载配置）在网页端没有对应动作，不出现。
-      const tools: MenuNode[] = [
-        { label: '查看余额', action: 'show-balance' },
-        { label: '查询天气', action: 'show-environment' },
-        { label: '待办事项', action: 'todo', hint: TODO_HOTKEY_HINT },
-        { label: '碎碎念', action: 'whisper' },
-        { label: '对话', action: 'chat', hint: CHAT_HOTKEY_HINT },
-        ...(memes ? [memes] : []),
-        ...(canSleep ? [sleepItem] : []),
-      ];
-      const tail: MenuNode[] = [
-        // 显示位置子菜单与桌面端同一份；改成不含 web 的值后本宠物会从页面消失。
-        displayMenuBranch(),
-        { label: '回到初始位置', action: 'home' },
-      ];
-      const tree: MenuNode[] = [
-        ...tools,
-        ...buildMenuTree(cfgRef.current.animations),
-        ...tail,
-        ...(more ? [more] : []),
-      ];
+      // 与桌面端同一排法。桌面专属的两项（打开软件、重载配置）在网页端没有对应动作，不出现。
+      const tree: MenuNode[] = buildCompactMenu({
+        primary: [
+          { label: '对话', action: 'chat', hint: CHAT_HOTKEY_HINT },
+          { label: '待办事项', action: 'todo', hint: TODO_HOTKEY_HINT },
+          ...(canSleep ? [sleepItem] : []),
+        ],
+        actions: buildMenuTree(cfgRef.current.animations),
+        rare: [
+          { label: '查看余额', action: 'show-balance' },
+          { label: '查询天气', action: 'show-environment' },
+          { label: '碎碎念', action: 'whisper' },
+          ...(memes ? [memes] : []),
+          // 显示位置子菜单与桌面端同一份；改成不含 web 的值后本宠物会从页面消失。
+          displayMenuBranch(),
+          { label: '回到初始位置', action: 'home' },
+        ],
+        thirdParty: more,
+      });
       if (!tree.length) return;
       e.preventDefault();
       e.stopPropagation(); // 不触碰 DSH 页面的菜单与右键处理。

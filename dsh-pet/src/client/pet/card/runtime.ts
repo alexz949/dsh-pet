@@ -7,6 +7,7 @@
  */
 import { pick } from '../../../shared/pickers.ts';
 import { postAction } from '../../../shared/state.ts';
+import { AUTO_SLEEP_CHECK_MS, isWorkBusy, shouldAutoSleep } from '../../../shared/auto-sleep.ts';
 import { ROUTE_PATH } from '../../../shared/constants.ts';
 import { resolveFontPx } from '../../../shared/fonts.ts';
 import { resolvePetSizePx } from '../../../shared/pet-size.ts';
@@ -218,7 +219,11 @@ export function createCardRuntime(rt: PetRuntime) {
       sleeping: () => liveRef.current.flow?.sleeping() ?? false,
       stopMove: motion.stopMove,
       stopThrow: () => motion.flight.stop(),
-      tryMove: motion.walk.tryMove,
+      // 菜单点播总带动作名，漫游范围不管它，不会返回「改转身」；这里收窄回原来的类型
+      tryMove: (name?: string) => {
+        const r = motion.walk.tryMove(name);
+        return typeof r === 'object' ? false : r;
+      },
       warn: (message) => console.warn(message),
     });
     const menuActions = menuActionsRef.current;
@@ -283,6 +288,54 @@ export function createCardRuntime(rt: PetRuntime) {
       // eslint-disable-next-line react-hooks/exhaustive-deps -- 只按叶子变化次数触发，sleep 是当拍快照
     }, [sleepTick]);
 
+    // 没人理就自己睡（pets[].autoSleepMinutes，判定见 shared/auto-sleep）：
+    // lastActive = 最近一次「有人理」；autoSlept = 这次是自己睡着的（DSH 再次干活时自己醒）。
+    const lastActiveRef = useRef(Date.now());
+    const autoSleptRef = useRef(false);
+    const wasSleepingRef = useRef(false);
+    const noteActive = (): void => {
+      lastActiveRef.current = Date.now();
+    };
+    // 主人开始忙：计入「有人理」；自己睡着且已进入循环段的宠物自己醒（手动哄睡的不叫醒）
+    useEffect(() => {
+      if (!isWorkBusy(workStatus?.state)) return;
+      noteActive();
+      if (autoSleptRef.current && liveRef.current.flow?.sleepPhase() === 'loop') {
+        autoSleptRef.current = false;
+        void postAction(ROUTE_PATH + '/wake?pet=' + encodeURIComponent(cfg.id));
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- 只看工作状态档位变化
+    }, [workStatus?.state]);
+    useEffect(() => {
+      const timer = window.setInterval(() => {
+        const live = liveRef.current;
+        const sleeping = (live.flow?.sleepPhase() ?? null) !== null;
+        // 刚醒（不论谁叫醒的）：清标记并从现在起重新计时
+        if (wasSleepingRef.current && !sleeping) {
+          autoSleptRef.current = false;
+          noteActive();
+        }
+        wasSleepingRef.current = sleeping;
+        const c = hub.cfg();
+        const go = shouldAutoSleep({
+          minutes: c.autoSleepMinutes,
+          lastActiveAt: lastActiveRef.current,
+          now: Date.now(),
+          sleeping,
+          frozen: ownAnim.isFrozen(),
+          dragging: drag.isActive(),
+          hasSleep: Array.isArray(c.animations?.sleep) && c.animations.sleep.length > 0,
+        });
+        if (!go) return;
+        autoSleptRef.current = true;
+        noteActive(); // 请求失败也别每 15 秒狂发
+        console.log('[dsh-pet] pet=' + c.id + ' 没人理 ' + c.autoSleepMinutes + ' 分钟：自己去睡');
+        void postAction(ROUTE_PATH + '/sleep?pet=' + encodeURIComponent(c.id));
+      }, AUTO_SLEEP_CHECK_MS);
+      return () => window.clearInterval(timer);
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- 挂载一次；回调里全读 ref / hub，不会读到旧值
+    }, []);
+
     const stageStyle = petStageStyle(bottomPad);
     const rootStyle = petRootStyle(
       customPos,
@@ -305,11 +358,9 @@ export function createCardRuntime(rt: PetRuntime) {
         // 它不是点击（拖了多久都一样）。醒着时这条由 drag.onClick 内部判，睡觉分支绕过了那里。
         if (drag.justDragged() || drag.isActive()) return;
         const phase = liveRef.current.flow?.sleepPhase() ?? null;
-        // 真睡着（循环中或醒来过渡）：点一下 = 叫醒。挤压与音效照常，
-        // 但不播点击回应动画——这一下的产物是「起来」。
+        // 真睡着（循环中或醒来过渡）：点一下 = 叫醒。音效照常（受 clickSoundEnabled 控制），
+        // 但不播点击回应动画——这一下的产物是「起来」。点击不做 Q 弹挤压（见 drag.ts 的 markSquash）。
         if (phase !== null && phase !== 'start') {
-          const front = ownAnim.frontVideo();
-          if (front) liveRef.current.squash.start(front);
           playClickSound();
           void postAction(ROUTE_PATH + '/wake?pet=' + encodeURIComponent(cfg.id));
           return;
@@ -318,8 +369,14 @@ export function createCardRuntime(rt: PetRuntime) {
         if (phase === 'start') void postAction(ROUTE_PATH + '/wake?pet=' + encodeURIComponent(cfg.id));
         drag.onClick();
       },
-      onContextMenu: entry.handleContextMenu,
-      onPointerDown: drag.onPointerDown,
+      onContextMenu: (e: Parameters<typeof entry.handleContextMenu>[0]) => {
+        noteActive(); // 右键 = 有人理
+        entry.handleContextMenu(e);
+      },
+      onPointerDown: (e: Parameters<typeof drag.onPointerDown>[0]) => {
+        noteActive(); // 点 / 拖 = 有人理：自己去睡的计时重新开始
+        drag.onPointerDown(e);
+      },
       onPointerEnter: entry.onPointerEnter,
       onPointerLeave: entry.onPointerLeave,
       onPointerMove: drag.onPointerMove,

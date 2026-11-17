@@ -6,6 +6,8 @@
  * @module dsh-pet/src/client/pet/motion/walk
  */
 import { planMoveAction, type PendingMove } from './move-action.ts';
+import { shouldTurnInsteadOfWalk, updateWanderHome, type WanderState } from '../../../shared/motion.ts';
+import { PET_REF_WIDTH } from '../../../shared/constants.ts';
 import type { BoxPoint } from './geometry.ts';
 import type { MovesConfig } from '../../../shared/types.ts';
 
@@ -45,14 +47,18 @@ export interface WalkDeps {
   commit(center: { rx: number; ry: number }): void;
 }
 
+/** 一次走位尝试的结果，见 {@link Walk.tryMove}。 */
+export type WalkResult = boolean | string | { turn: true };
+
 /** 走位驱动：一个宠物一个实例。 */
 export interface Walk {
   /** 是否有排队的动作；视频就绪时据此决定要不要开跑。 */
   hasPending(): boolean;
   /** 视频就绪后开跑；没有排队的动作时立即返回。 */
   start(el: HTMLVideoElement): void;
-  /** 尝试发起一次走位：占用中返回 `true`，无法移动返回 `false`，成功返回动作名。 */
-  tryMove(preferredName?: string): boolean | string;
+  /** 尝试发起一次走位：占用中返回 `true`，无法移动返回 `false`，成功返回动作名；
+   *  开了漫游范围且这一步会走出范围 / 撞边时返回 `{ turn: true }`（调用方改播转身）。 */
+  tryMove(preferredName?: string): WalkResult;
   /** 停走：作废已排队的动作并取消在跑的帧。 */
   stop(): void;
 }
@@ -73,6 +79,8 @@ export function createWalk(deps: WalkDeps): Walk {
   let token = 0;
   /** 已规划、等待视频就绪的走位。 */
   let pending: PendingMove | null = null;
+  /** 漫游范围的「家」与上次走到哪（见 shared/motion 的 WanderState）。 */
+  const wander: WanderState = { home: null, lastWalkX: null };
 
   const hasPending = (): boolean => pending !== null;
 
@@ -94,6 +102,7 @@ export function createWalk(deps: WalkDeps): Walk {
       // 按规划落点插值而不是 dir × 距离：minDist/maxDist 为负时符号必须保留，
       // 否则规划往左、驱动往右，走完再跳回原本的方向。
       else ratioX = move.startRatio + (move.targetRatio - move.startRatio) * ((t - move.leadSec) / travelWindow);
+      wander.lastWalkX = ratioX * W; // 记住走到哪了，下次走位前据此判断有没有被挪过
       const box = { x: ratioX * W - halfW, y: move.startYRatio * H - halfH };
       const rootEl = deps.root();
       if (rootEl) {
@@ -113,7 +122,7 @@ export function createWalk(deps: WalkDeps): Walk {
     frame = requestAnimationFrame(step);
   };
 
-  const tryMove = (preferredName?: string): boolean | string => {
+  const tryMove = (preferredName?: string): WalkResult => {
     // 占用中返回 true：调用方据此知道宠物没空，不必再挑原地动作。
     if (frame !== null || pending !== null || deps.isFlying()) return true;
     const metrics = deps.metrics();
@@ -128,6 +137,14 @@ export function createWalk(deps: WalkDeps): Walk {
       halfW: metrics.halfW,
       sideAllow: metrics.sideAllow,
     });
+    // 漫游范围：随机链的走位走出范围 / 撞边时改播转身再往回走（菜单点播的走位不受限）
+    if (preferredName === undefined) {
+      const center = deps.center();
+      const range = (Number(deps.moves().default.wanderRange) || 0) * (metrics.size / PET_REF_WIDTH);
+      updateWanderHome(wander, center.x);
+      const targetX = action === null ? null : action.pending.targetRatio * deps.viewport().width;
+      if (wander.home !== null && shouldTurnInsteadOfWalk(range, wander.home, targetX)) return { turn: true };
+    }
     if (action === null) return false;
     pending = action.pending;
     deps.play(action.anim);

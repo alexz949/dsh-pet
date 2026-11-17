@@ -71,6 +71,13 @@ export function animationNames(animations: unknown): string[] {
     }
   }
 
+  // 循环状态：状态名本身可点播（播放端换成进入段），没写进分类的状态也能经 /anim 触发
+  if (Array.isArray(a.states)) {
+    for (const st of a.states) {
+      if (st && typeof st === 'object') push(strings([(st as { name?: unknown }).name]));
+    }
+  }
+
   // 事件动画：值是「档位数组」，每档可能是单个名字或候选数组（展平）
   const events = (a.events && typeof a.events === 'object' ? a.events : {}) as Record<string, unknown>;
   for (const key of Object.keys(events)) {

@@ -70,3 +70,18 @@ describe('decideNextAnimation —— 自播动画决策', () => {
     assert.equal(fallback.anim, 'idle1');
   });
 });
+
+test('走出漫游范围（move = { turn: true }）：改播转身', async () => {
+  const { decideNextAnimation } = await import('./next-animation.ts');
+  const animations = {
+    idle: ['i'],
+    turn: ['t'],
+    drag: [],
+    clicks: [],
+    moves: { default: {}, actions: [] },
+    categories: [],
+    events: {},
+  } as never;
+  const d = decideNextAnimation({ kind: 'move', animations, facing: 'left', current: 'i', move: { turn: true } });
+  assert.deepEqual(d, { kind: 'TURN', anim: 't', play: true });
+});

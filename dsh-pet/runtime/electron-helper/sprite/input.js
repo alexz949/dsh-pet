@@ -11,6 +11,7 @@ Object.assign(PetSprite.prototype, {
   onPointerDown(e) {
     // 只认左键：右键进入拖拽判定会与右键菜单打架
     if (e.button !== 0) return;
+    this.lastActiveAt = Date.now(); // 有人理：自己去睡的计时重新开始
     // 占用锁：用户点了或拖了这只宠物 = 用户接管，立刻撤掉第三方占用。这是唯一一处「渲染端 → 宿主」
     // 的锁上报——宿主看不见鼠标，而锁在它手里（/lock/release 的 force 形态）。
     // 先本地解冻再上报：等叶子往返会让宠物「点了半天才动」，而此刻 frozen 为真说明这次释放必然成功。
@@ -389,13 +390,11 @@ Object.assign(PetSprite.prototype, {
     }
     this.stopThrow(); // 点击飞行中的宠物 = 收手停住（再播点击回应）
     this.stopMove();
-    // 睡觉：点一下就是叫醒。挤压与音效照常（手感与平时一致），但不播点击回应动画——
+    // 睡觉：点一下就是叫醒。音效照常（受 clickSoundEnabled 控制），但不播点击回应动画——
     // 叫醒的表现由 /wake 写回的 sleep 叶子驱动（end 播一遍，播完回随机链）。
-    // 这里直接压当前前台那一帧：平时靠 pendingSquash 等新动画就位，这条路没有换源。
+    // 点击不再做 Q 弹挤压：挤压只作用在新段上，换段垫底期间会和下面的旧段叠出重影。
     if (this.sleeping) {
       playClickSound();
-      const front = this.front === 0 ? this.videoA : this.videoB;
-      if (front) this.startSquash(front);
       this.postSleepAction('wake');
       // 入睡过渡里被点：这次入睡作废，按普通点击播回应动画——「起来」那段不再播。
       // 先本地清状态：等叶子回来时 setSleep 会因「本来没睡」直接返回，不会插一段 end。
@@ -410,7 +409,7 @@ Object.assign(PetSprite.prototype, {
     // 点击音效与浏览器同位置：放在「按下已触发积分」的早退之后、点击动画判断之前
     playClickSound();
     if (!this.animations.clicks.length) return;
-    this.pendingSquash = true; // 等新点击动画切到前台后 Q 弹（压新首帧，与浏览器一致）
+    // 点击不做 Q 弹挤压（见上）：直接播点击回应。抛掷落地的挤压是物理反馈，照旧。
     this.playOnce(S.pick(this.animations.clicks));
   },
 

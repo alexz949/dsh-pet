@@ -6,6 +6,7 @@
  * @module dsh-pet/src/host/config/validate
  */
 import { FONT_SIZE_MAX, FONT_SIZE_MIN } from '../../shared/fonts.ts';
+import { loopStatesValid } from '../../shared/loop-states.ts';
 import { VOICE_ID_PATTERN } from '../voice/types.ts';
 import { FONT_FAMILY_SET } from './constants.ts';
 
@@ -60,7 +61,9 @@ function animationsValid(a: unknown): boolean {
   if (anims.baifan !== undefined && !activitySlotsValid(anims.baifan)) return false;
   // sleep 可选：pet pack 不写也合法（不同角色的睡觉素材不一样，不能强求）。
   // 写了才校验形状——一个空套或空段会让状态机「进去了但没动画播」，比不配更难解释。
-  return anims.sleep === undefined || sleepValid(anims.sleep);
+  if (anims.sleep !== undefined && !sleepValid(anims.sleep)) return false;
+  // states 可选：循环状态（坐下坐一会儿再起来）。写了才校验——空段会让状态「进去了但没动画播」。
+  return anims.states === undefined || loopStatesValid(anims.states);
 }
 
 /** sleep 段校验：非空套数组，每套都必须有非空的 start / loop / end 字符串数组。

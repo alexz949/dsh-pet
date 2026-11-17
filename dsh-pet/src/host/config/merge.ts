@@ -7,6 +7,7 @@
  */
 import { CORNER_SET, GLOBAL_DEFAULT_KEYS, isValidPetId, PET_DISPLAY_SET, warnOnce } from './constants.ts';
 import { isValidSizePercent, SIZE_PERCENT_DEFAULT, SIZE_PERCENT_MIN } from '../../shared/pet-size.ts';
+import { isValidAutoSleepMinutes } from '../../shared/auto-sleep.ts';
 import { topFieldValid } from './validate.ts';
 
 /**
@@ -95,6 +96,16 @@ function petNumber(own: unknown, def: unknown, min: number, label: string, field
   return Number(def);
 }
 
+/** 实例级 autoSleepMinutes：写了大于 0 的合法值才落键（0 = 关闭，与没写一样不落键）；
+ *  显式写了非法值 → 告警一次并忽略。与 sizePercent 同理不补默认值，免得保存时凭空写出一个键。 */
+function petAutoSleepField(own: unknown, def: unknown, label: string, id: string): { autoSleepMinutes?: number } {
+  const value = own ?? def;
+  if (value === undefined || value === null) return {};
+  if (isValidAutoSleepMinutes(value)) return value > 0 ? { autoSleepMinutes: value } : {};
+  warnOnce(`${label}:autoSleepMinutes:${id}`, `宠物「${id}」的 autoSleepMinutes 非法（应为 ≥0 的数字），已忽略`);
+  return {};
+}
+
 /** 实例级 sizePercent：写了合法值才落键；缺省与越界都不落键，渲染侧按默认值处理。
  *  不补默认值——补了会让「没动过」在保存时变成显式值，配置文件凭空长大，且没有用户层时形状不一致。 */
 function petSizePercentField(own: unknown, def: unknown, label: string, id: string): { sizePercent?: number } {
@@ -165,6 +176,7 @@ function mergePet(
     whisperEnabled: petBool(p.whisperEnabled, base.whisperEnabled, label, 'whisperEnabled', id),
     workStatusEnabled: petBool(p.workStatusEnabled, base.workStatusEnabled, label, 'workStatusEnabled', id),
     fixedEnabled: petBool(p.fixedEnabled, base.fixedEnabled, label, 'fixedEnabled', id),
+    ...petAutoSleepField(p.autoSleepMinutes, base.autoSleepMinutes, label, id),
     display: petEnum(p.display, PET_DISPLAY_SET, base.display, label, 'display', id),
     position: {
       corner: petEnum(ownPos.corner, CORNER_SET, basePos.corner, label, 'position.corner', id),

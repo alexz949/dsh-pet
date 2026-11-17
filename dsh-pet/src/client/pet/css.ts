@@ -20,13 +20,14 @@ const PET_CSS = [
   '.dsh-pet-root[data-corner="top-left"]{left:var(--dsh-pet-mx,24px);top:var(--dsh-pet-my,0)}',
   '.dsh-pet-stage{position:relative;width:var(--dsh-pet-size,462px);height:calc(var(--dsh-pet-size,462px)*9/16);pointer-events:none}',
   // 与桌面 helper 同一条修正（开关是共享常量 PET_ALPHA_FIX_ENABLED），滤镜定义见 ensureAlphaFilter。
-  `.dsh-pet-video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;opacity:0;transition:opacity .18s ease;transform-origin:center${ALPHA_FIX_FILTER}}`,
-  '.dsh-pet-video.is-front{opacity:1}',
+  // 换段是硬切（不做透明度过渡）：两层半透明叠加时宠物会变淡一下。切换细节见 animation/animation.ts 的 presentSwap。
+  // 后台视频留 1% 不透明：完全透明时浏览器不把它送进合成层，翻到前台的第一帧会是空的（整只宠物闪一下）。
+  `.dsh-pet-video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;opacity:0.01;transition:none;transform-origin:center${ALPHA_FIX_FILTER}}`,
+  '.dsh-pet-video.is-front{opacity:1;z-index:1}',
   // 触屏拖拽必需：缺 touch-action:none 时浏览器会把手势判成滚动并触发 pointercancel；
   // 两条 -webkit-* 抑制长按选中与 iOS 长按系统菜单。
   `.dsh-pet-hit{position:absolute;pointer-events:auto;cursor:url("${ROUTE_PATH}/pic/cursor-grab.png") 16 16, grab;z-index:1;touch-action:none;-webkit-user-select:none;-webkit-touch-callout:none}`,
   `.dsh-pet-hit.dragging{cursor:url("${ROUTE_PATH}/pic/cursor-grabbing.png") 16 16, grabbing}`,
-  '@media (prefers-reduced-motion: reduce){.dsh-pet-video{transition:none}}',
   // 统一右键菜单样式，与桌面注入同一份。
   MENU_CSS,
   // 悬浮提示样式，与桌面注入同一份。

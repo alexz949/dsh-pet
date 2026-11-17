@@ -59,6 +59,37 @@ export const planMove = (o: {
 };
 
 /**
+ * 漫游范围（moves.default.wanderRange）：宠物以「家」为中心左右各走这么远；下一步会走出范围、
+ * 或被屏幕边挡住时，随机链改播转身再往回走，于是在家附近来回溜达而不是越走越远。
+ * 「家」= 最近一次被别人（拖拽 / 抛掷 / 回到初始位置 / 位置指令）放下的地方：
+ * 走位前当前位置不等于上次走位结束的位置，就说明被挪过，家改成当前位置（updateWanderHome）。
+ */
+export interface WanderState {
+  /** 家的中心 x（px）；null = 还没定。 */
+  home: number | null;
+  /** 上次走位最后一帧的中心 x（px）；null = 还没走过。 */
+  lastWalkX: number | null;
+}
+
+/** 走位前更新「家」：被挪过（离上次走位终点超过 3px）或还没定 → 家 = 当前位置。 */
+export function updateWanderHome(state: WanderState, currentX: number): void {
+  if (state.home === null || state.lastWalkX === null || Math.abs(currentX - state.lastWalkX) > 3) {
+    state.home = currentX;
+  }
+}
+
+/**
+ * 这一步该不该改成转身：开了漫游范围（range > 0）时，落点越界（plan 为 null）或离家超出范围都转身。
+ * @param range - 漫游半径（px，已按宠物尺寸缩放）；≤ 0 = 不限（保持原行为：越界退回原地动作）。
+ * @param home - 家的中心 x。
+ * @param targetX - 这一步的落点中心 x；落点越界时为 null。
+ */
+export function shouldTurnInsteadOfWalk(range: number, home: number, targetX: number | null): boolean {
+  if (!(range > 0)) return false;
+  return targetX === null || Math.abs(targetX - home) > range;
+}
+
+/**
  * 角落 + 边距 → 宠物根节点左上角像素坐标，与浏览器半侧 overlay 的 CSS 角落语义一致。
  * area 传入时角落取那块屏而不是视口外接矩形：不规则布局下外接矩形的角落可能不属于任何屏，
  * 配了该角落的宠物会开机即隐身，所以桌面端必须传主屏工作区。不传时按 W/H，overlay 行为不变。

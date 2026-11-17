@@ -27,8 +27,9 @@ export interface NextAnimationInput {
   facing: 'left' | 'right';
   /** 当前正在播的动画名，用于「不连抽自己」。 */
   current: string;
-  /** 走位尝试结果，仅 `kind === 'move'` 时有意义：动作名 = 成功，`true` = 占用中，`false` = 无法移动。 */
-  move?: string | true | false;
+  /** 走位尝试结果，仅 `kind === 'move'` 时有意义：动作名 = 成功，`true` = 占用中，`false` = 无法移动，
+   *  `{ turn: true }` = 开了漫游范围、这一步会走出范围或撞边，改播转身。 */
+  move?: string | boolean | { turn: true };
 }
 
 /**
@@ -41,6 +42,9 @@ export function decideNextAnimation(input: NextAnimationInput): NextAnimation {
   const { kind, animations, facing, current, move } = input;
   if (kind === 'idle') return { kind: 'IDLE', anim: pick(animations.idle, current), play: true };
   if (kind === 'turn') return { kind: 'TURN', anim: pick(animations.turn, current), play: true };
+  if (kind === 'move' && typeof move === 'object') {
+    return { kind: 'TURN', anim: pick(animations.turn, current), play: true };
+  }
   if (kind === 'move' && move !== false && move !== undefined) {
     // 占用中（true）不重播；成功则是那次走位已经切好的动作名，只用于日志。
     return { kind: 'MOVES', anim: typeof move === 'string' ? move : null, play: false };

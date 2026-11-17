@@ -7,9 +7,48 @@
  */
 'use strict';
 
+/**
+ * 桌面端播哪种素材：macOS 上优先 .mov（HEVC 带透明通道，走硬件解码），其余平台 .webm（VP9 透明只能软解）。
+ * 实测（Apple M3、4 只宠物）：webm 约 51% 单核，mov 约 36% 单核，透明背景一致。
+ * 宿主在 .mov 缺失时自动退回同名 .webm（见 host 的 /thumb 路由），所以没有 mov 素材的宠物照常显示。
+ */
+const DESKTOP_VIDEO_EXT = (() => {
+  try {
+    const mac = /Mac/.test(navigator.platform || navigator.userAgent || '');
+    const hevc = document.createElement('video').canPlayType('video/mp4; codecs="hvc1.1.6.L93.B0"') !== '';
+    return mac && hevc ? '.mov' : S.ANIMATION_EXT || '.webm';
+  } catch {
+    return S.ANIMATION_EXT || '.webm';
+  }
+})();
+
 Object.assign(PetSprite.prototype, {
   switchTo(next, nextOnce, playbackId, url) {
     if (!next) return;
+    // 循环状态：名字是状态名（不是素材）→ 开始这个状态，实际播它的进入段。
+    // 入口放在换源这里，随机链 / 菜单点播 / /anim / 对话联动都不用各自识别。
+    // 保持中的状态（如「等你确认」时坐着）：别的动画要播时先站起来——放开到退出段，
+    // 把这次请求挂起，退出段播完再播它（advanceLoopRun）。同一个状态再被请求则原样保持。
+    if (!this.loopInternal && this.loopRun && this.loopRun.hold) {
+      if (next === this.loopRun.state.name) return;
+      this.afterLoopExit = { next, nextOnce, playbackId, url };
+      this.releaseHeldState();
+      return;
+    }
+    if (!url) {
+      const st = S.findLoopState(this.animations.states, next);
+      if (st) {
+        // 当循环来播（nextOnce=false：工作状态进行中档位）= 保持模式，一直坐到有别的事
+        this.loopRun = S.startLoopState(st, !nextOnce);
+        this.playLoopClip(this.loopRun.clip, playbackId);
+        return;
+      }
+    }
+    // 不是状态机自己发起的换源 = 打断了正在进行的状态（之后 ended 也不会再推进它）
+    if (!this.loopInternal) {
+      this.loopRun = null;
+      this.afterLoopExit = null;
+    }
     // 「当前在播哪一段」只在这里写：ended 分流、回空闲补丁、随机链避重都读它。
     // 交给调用方维护时 switchTo(x, false) 会留下过期值，events.js 判「是不是工作动画」就永远不成立。
     this.anim = next;
@@ -36,10 +75,13 @@ Object.assign(PetSprite.prototype, {
     if (!el) return;
     // 素材地址两条路：url 形态直接用第三方给的完整地址（宿主已把 scheme 卡在 http/https，
     // 不经 bridge、也不拼 BASE）；name 形态按「素材根 + 名字」拼。
-    el.src = url || this.assetBase + encodeURIComponent(next) + (S.ANIMATION_EXT || '.webm');
+    el.src = url || this.assetBase + encodeURIComponent(next) + DESKTOP_VIDEO_EXT;
     el.loop = !nextOnce;
     el.muted = true;
-    el.autoplay = true;
+    // 不自动播：预载时新段要停在首帧等上一段播完（见 onReady），开播统一由 start() 里的 play() 负责。
+    // preload=auto 保证不自动播时 loadeddata（首帧可解码）照样会来。
+    el.autoplay = false;
+    el.preload = 'auto';
     el.playsInline = true;
     el.onended = nextOnce ? () => this.handleEnded() : () => this.restartLoop(el);
     // 加载兜底（同浏览器端 10s 超时）：素材加载失败或卡住时必须释放 pending，否则它永久挂起——
@@ -66,11 +108,33 @@ Object.assign(PetSprite.prototype, {
       el.onerror = null;
       if (this.pending && this.pending.gen !== gen) return;
       const old = this.front === 0 ? this.videoA : this.videoB;
-      el.classList.add('is-front');
+      // 预载：上一段是提前收尾的（armPreroll），它还在播最后零点几秒。新段已解码好、停在首帧，
+      // 等旧段真正播完的那一刻再开播，旧段一帧都不截。期间 pending 保持不变：被打断（点击/拖拽）时
+      // 新的 switchTo 会覆盖 gen，这里的 start 自然作废，旧段仍在前台，不会出现空档。
+      const preroll = this.preroll;
+      this.preroll = null;
+      if (preroll && preroll.el === old && old !== el && !old.ended && !old.paused) {
+        let started = false;
+        const go = () => {
+          if (started) return;
+          started = true;
+          old.removeEventListener('ended', go);
+          window.clearTimeout(safety);
+          start();
+        };
+        old.addEventListener('ended', go);
+        // 兜底：ended 万一不来（解码提前停住），按剩余时长 + 余量强制开播
+        const remain = Number.isFinite(old.duration) ? Math.max(0, old.duration - old.currentTime) : 0;
+        const safety = window.setTimeout(go, remain * 1000 + 300);
+        return;
+      }
+      start();
+    };
+    const start = () => {
+      if (this.pending && this.pending.gen !== gen) return;
+      const old = this.front === 0 ? this.videoA : this.videoB;
       if (old && old !== el) {
-        old.classList.remove('is-front');
         old.onended = null;
-        old.pause();
         // 被换下去的那一段若属第三方点播且没播完 → 如实回 cancelled（被新点播顶掉由宿主受理时标记，
         // 这里补的是点击/拖拽/碎碎念/余额/工作状态/空闲回收这类非点播打断）。
         if (this.playback && this.playback !== playbackId) {
@@ -81,6 +145,9 @@ Object.assign(PetSprite.prototype, {
       this.pending = null;
       this.playback = playbackId || null;
       el.style.transform = this.facing === 'right' ? 'scaleX(-1)' : '';
+      // 硬切：旧段保持可见，新段首帧真正画上屏幕后同一刻互换（presentSwap），不留空档也不叠半透明
+      this.presentSwap(el, old);
+      if (nextOnce) this.armPreroll(el);
       el.play()
         .then(() => {
           // 只有 play() 兑现才代表确实开始出画（loadeddata 只代表可解码）
@@ -104,6 +171,63 @@ Object.assign(PetSprite.prototype, {
   },
 
   /**
+   * 硬切换段：新段首帧真正出画后，同一刻把它设为前台、旧段降为后台并停播。
+   *
+   * 不能在 loadeddata 时直接换：那时新段还没画出第一帧，立刻隐藏旧段会闪一下空白；
+   * 也不能做透明度过渡：两层半透明叠加时宠物整体只有约 75% 不透明，看起来像闪烁。
+   * 后台视频保持 1% 不透明（index.html），一直在合成层里，翻到前台的第一帧就有画面，
+   * 所以不需要让旧段垫底——垫底在中途打断（点击等）时会和新段叠出重影。
+   * 换之前若又有新的换段把前台指走了，这次就作废，不把过期的段翻回前台。
+   */
+  presentSwap(el, old) {
+    const idx = el === this.videoA ? 0 : 1;
+    let done = false;
+    const swap = () => {
+      if (done) return;
+      done = true;
+      window.clearTimeout(fallback);
+      if (this.front !== idx) return;
+      el.classList.add('is-front');
+      if (old && old !== el) {
+        old.classList.remove('is-front');
+        old.pause();
+      }
+    };
+    // 兜底：窗口被遮挡等情况下帧回调可能不来，最多等 120ms 就直接换
+    const fallback = window.setTimeout(swap, 120);
+    if (typeof el.requestVideoFrameCallback === 'function') el.requestVideoFrameCallback(swap);
+    else swap();
+  },
+
+  /**
+   * 预载下一段：一次性段播到只剩 PREROLL_SEC 秒时，提前走 ended 的收尾逻辑选出下一段并开始加载。
+   *
+   * 原来是真播完才去加载下一段，加载 + 解码期间画面停在末帧，每次换段都顿一下。
+   * 提前触发后，switchTo 的 onReady 会等这一段真正播完再开播新段（见 this.preroll），
+   * 所以不会截掉这一段的尾巴。中途被打断（换了别的段 / 冻结暂停）时帧回调自然停掉。
+   */
+  armPreroll(el) {
+    if (typeof el.requestVideoFrameCallback !== 'function') return;
+    const PREROLL_SEC = 0.35;
+    const cb = el.onended;
+    const tick = (_now, meta) => {
+      // 已不是这一段在前台 / 已改成循环 / onended 被换掉（被打断或已收尾）→ 停止监视
+      if (el.onended !== cb || el.loop || !cb) return;
+      const d = el.duration;
+      if (Number.isFinite(d) && d - meta.mediaTime <= PREROLL_SEC) {
+        el.onended = null; // 只触发一次：真正的 ended 不再重复收尾
+        this.preroll = { el };
+        cb();
+        // 收尾逻辑没有换段（拖拽中 / 冻结 / 睡眠循环等）：撤掉标记，免得之后的点击还要等这一段播完
+        if (!this.pending) this.preroll = null;
+        return;
+      }
+      el.requestVideoFrameCallback(tick);
+    };
+    el.requestVideoFrameCallback(tick);
+  },
+
+  /**
    * 循环段收到 ended：原地回起点续播。
    *
    * 循环段本不该有 ended；出现说明素材被截断或解码提前结束，画面已停在末帧。
@@ -116,6 +240,50 @@ Object.assign(PetSprite.prototype, {
 
   playOnce(name, playbackId, url) {
     this.switchTo(name, true, playbackId, url);
+  },
+
+  /** 状态机自己换段：标记为内部换源，不算打断。每段都 once=true，靠 ended 推进。 */
+  playLoopClip(clip, playbackId) {
+    this.loopInternal = true;
+    try {
+      this.switchTo(clip, true, playbackId);
+    } finally {
+      this.loopInternal = false;
+    }
+  },
+
+  /**
+   * 循环状态的 ended：推进到下一段，退出段播完回随机链。
+   * @returns true = 这次 ended 归状态机处理（调用方直接返回）。
+   */
+  advanceLoopRun() {
+    const run = this.loopRun;
+    if (!run) return false;
+    // ended 不是状态当前那一段的（期间被别的动画顶掉过）：状态作废，交回原逻辑
+    if (this.anim !== run.clip) {
+      this.loopRun = null;
+      return false;
+    }
+    const next = S.advanceLoopState(run);
+    if (next) {
+      this.loopRun = next;
+      this.playLoopClip(next.clip);
+      return true;
+    }
+    this.loopRun = null;
+    // 退出段播完：有挂起的请求（保持期间来的）就播它，否则回随机链
+    const after = this.afterLoopExit;
+    this.afterLoopExit = null;
+    if (after) this.switchTo(after.next, after.nextOnce, after.playbackId, after.url);
+    else this.playIdle();
+    return true;
+  },
+
+  /** 放开保持中的状态：改播退出段（站起来），退出段播完由 advanceLoopRun 接着走。 */
+  releaseHeldState() {
+    if (!this.loopRun || !this.loopRun.hold) return;
+    this.loopRun = S.releaseLoopState(this.loopRun);
+    this.playLoopClip(this.loopRun.clip);
   },
 
   // 直接播一个外部地址。单独一个方法、不复用 onMenuAction：那套是菜单语义（文字类强制朝左的镜像
@@ -202,6 +370,9 @@ Object.assign(PetSprite.prototype, {
     if (!state) return;
     const stamp = '[dsh-pet] ' + new Date().toTimeString().slice(0, 8) + ' pet=' + this.pet.id;
     if (!state.sleeping) {
+      // 醒来（不论谁叫醒的）：清掉「自己睡的」标记，并从现在起重新计时
+      this.autoSlept = false;
+      this.lastActiveAt = Date.now();
       // 没在睡：醒来是幂等的空操作（重复叶子、老宿主，或叫醒一个本来醒着的宠物）
       if (!this.sleeping || this.sleepPhase === 'end') return;
       // 入睡过渡里被叫醒：取消这次入睡，不播「起来」——它不是真的睡着过。
@@ -240,6 +411,49 @@ Object.assign(PetSprite.prototype, {
    * 点击与右键菜单共用这一条路径；失败只记日志，不弹框——菜单动作不该打断用户。
    * @param action - `'sleep'` = 睡下，`'wake'` = 叫醒。
    */
+  /**
+   * 没人理就自己睡：由 startLoops 每 AUTO_SLEEP_CHECK_MS 调一次。判定在 shared/auto-sleep。
+   * 发的是与右键「睡觉」同一个请求，睡姿由宿主挑、经 sleep 叶子回来驱动画面。
+   */
+  checkAutoSleep() {
+    const now = Date.now();
+    const go = S.shouldAutoSleep({
+      minutes: this.pet.autoSleepMinutes,
+      lastActiveAt: this.lastActiveAt,
+      now,
+      sleeping: this.sleeping,
+      frozen: this.frozen,
+      dragging: !!(this.dragState && this.dragState.active),
+      hasSleep: Array.isArray(this.animations.sleep) && this.animations.sleep.length > 0,
+    });
+    if (!go) return;
+    this.autoSlept = true;
+    this.lastActiveAt = now; // 请求失败也别每 15 秒狂发
+    console.log(
+      '[dsh-pet] ' +
+        new Date().toTimeString().slice(0, 8) +
+        ' pet=' +
+        this.pet.id +
+        ' 没人理 ' +
+        this.pet.autoSleepMinutes +
+        ' 分钟：自己去睡',
+    );
+    this.postSleepAction('sleep');
+  },
+
+  /**
+   * 工作状态变化：主人开始忙 = 有人理；自己睡着的宠物（已进入循环段）这时自己醒。
+   * 手动哄睡的不叫醒；入睡过渡中也不叫醒（setSleep 对过渡段的叫醒有专门语义）。
+   */
+  noteWorkActivity(state) {
+    if (!S.isWorkBusy(state)) return;
+    this.lastActiveAt = Date.now();
+    if (this.sleeping && this.autoSlept && this.sleepPhase === 'loop') {
+      this.autoSlept = false;
+      this.postSleepAction('wake');
+    }
+  },
+
   postSleepAction(action) {
     const route = action === 'wake' ? '/wake' : '/sleep';
     S.postAction(BASE + route + '?pet=' + encodeURIComponent(this.pet.id)).then((ok) => {
@@ -268,7 +482,10 @@ Object.assign(PetSprite.prototype, {
       next = S.pick(animations.turn, this.anim);
     } else if (k === 'move') {
       const moved = this.tryMove();
-      if (moved === false) {
+      if (moved && typeof moved === 'object' && moved.turn) {
+        // 走出漫游范围 / 撞边：先转身，转完下一次掷骰再往回走
+        next = S.pick(animations.turn, this.anim);
+      } else if (moved === false) {
         const act = S.pickCategoryAction(animations.categories, animations.idle, this.facing, this.anim);
         next = act.name;
       } else if (typeof moved === 'string') {
@@ -319,6 +536,8 @@ Object.assign(PetSprite.prototype, {
       return;
     }
     if (this.dragState.active) return;
+    // 循环状态（坐下坐一会儿再起来）：放在冻结判断之后——冻结期间不推进，解冻后由原逻辑接管
+    if (!this.frozen && this.advanceLoopRun()) return;
     // 占用锁：冻结期间动画链一律不推进，事件动画播完就停在最后一帧。下面几条路都会换源播放，
     // 而它们读的是实时 workState、与 workTick 无关，onWorkTick 的门禁拦不住——尤其「事件动画播完
     // 恢复档位」：持锁者每投一次带 anim 的气泡，说话动画播完就把工作状态动画点回来。
@@ -437,6 +656,14 @@ Object.assign(PetSprite.prototype, {
       sideAllow: this.sideAllow,
       areas: wanderArea ? [wanderArea] : AREAS,
     });
+    // 漫游范围：随机链的走位走出范围 / 撞边时改播转身再往回走（菜单点播的走位不受限）
+    if (!preferredName) {
+      const range = (Number(mp.wanderRange) || 0) * distScale;
+      S.updateWanderHome(this.wander, cx);
+      if (S.shouldTurnInsteadOfWalk(range, this.wander.home, plan ? plan.targetRatio * W : null)) {
+        return this.animations.turn.length ? { turn: true } : false;
+      }
+    }
     if (!plan) return false;
     this.pendingMove = { ...plan, dir, leadSec: mp.leadSec, tailSec: mp.tailSec };
     this.switchTo(chosen.name, true, playbackId);

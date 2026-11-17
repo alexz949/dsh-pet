@@ -7,6 +7,13 @@
  * @module dsh-pet/src/client/pet/animation/animation
  */
 import { isEventAnim } from '../../../shared/pickers.ts';
+import {
+  advanceLoopState,
+  findLoopState,
+  releaseLoopState,
+  startLoopState,
+  type LoopStateRun,
+} from '../../../shared/loop-states.ts';
 import { decideEndedCue, type EndedCue, type FreezeCue } from './cues.ts';
 import type { ReportableStatus } from '../../../shared/playback.ts';
 import type { Animations } from '../../../shared/types.ts';
@@ -26,6 +33,47 @@ const REASON_FROZEN = 'frozen';
 
 /** 资源超时（ms）：DSH WebServer 偶发 stalled，超时就丢弃本次换源。 */
 const ASSET_FETCH_TIMEOUT_MS = 10_000;
+
+/** 前台 class（样式见 ../css.ts）。 */
+const FRONT_CLASS = 'is-front';
+/** 新段首帧回调最多等多久就直接换（ms）：标签页在后台等情况下帧回调可能不来。 */
+const SWAP_FALLBACK_MS = 120;
+/** 一次性段剩这么多秒时就提前收尾、预载下一段，消除换段时停在末帧的那一下。 */
+const PREROLL_SEC = 0.35;
+
+/** 带帧回调的 video：Chromium / Safari 有，jsdom 与老浏览器没有。 */
+type FrameVideo = HTMLVideoElement & {
+  requestVideoFrameCallback?: (cb: (now: number, meta: { mediaTime: number }) => void) => number;
+};
+
+/**
+ * 硬切换段：新段首帧真正出画后，同一刻把它设为前台、旧段降为后台并停播。
+ *
+ * 不在 loadeddata 时直接换（新段还没画出第一帧会闪空白），不做透明度过渡（两层半透明叠加时
+ * 宠物整体只有约 75% 不透明，像闪烁）。后台视频保持 1% 不透明（../css.ts），一直在合成层里，
+ * 翻到前台的第一帧就有画面，所以不让旧段垫底——垫底在中途打断时会和新段叠出重影。
+ * @param el - 新段。
+ * @param outgoing - 旧段；与 el 相同或为空时只设前台。
+ * @param isStillFront - 换的那一刻新段是否仍是前台；被更新的换段抢先时这次作废。
+ */
+function presentSwap(el: HTMLVideoElement, outgoing: HTMLVideoElement | null, isStillFront: () => boolean): void {
+  let done = false;
+  const swap = (): void => {
+    if (done) return;
+    done = true;
+    clearTimeout(fallback);
+    if (!isStillFront()) return;
+    el.classList.add(FRONT_CLASS);
+    if (outgoing !== null && outgoing !== el) {
+      outgoing.classList.remove(FRONT_CLASS);
+      outgoing.pause();
+    }
+  };
+  const fallback = setTimeout(swap, SWAP_FALLBACK_MS);
+  const fv = el as FrameVideo;
+  if (typeof fv.requestVideoFrameCallback === 'function') fv.requestVideoFrameCallback(swap);
+  else swap();
+}
 
 /** 日志时间戳：与其余宠物日志同一格式，便于对照同一次事件。 */
 const stamp = (petId: string): string => new Date().toTimeString().slice(0, 8) + ' pet=' + petId;
@@ -113,6 +161,21 @@ export function createOwnAnimation(deps: OwnAnimationDeps): OwnAnimation {
   const loader = deps.loader ?? createAssetLoader(ASSET_FETCH_TIMEOUT_MS);
   /** 挂载标志：卸载后迟到的加载结果直接丢弃。 */
   let mounted = true;
+  /**
+   * 提前收尾的那一段（armPreroll）：它还在播最后零点几秒，下一段加载好后要等它真正播完再开播。
+   * `null` = 没有预载在等。
+   */
+  let preroll: HTMLVideoElement | null = null;
+  /**
+   * 循环状态（animations.states）的进行中记录；null = 不在状态里。
+   * 状态机自己换段时 loopInternal 为真，其余任何换源都视为打断。currentClip = 最近一次真正换源的素材名。
+   */
+  let loopRun: LoopStateRun | null = null;
+  let loopInternal = false;
+  let currentClip = '';
+  /** 保持中的状态被别的动画请求打断时，那次请求先挂在这里，等退出段（站起来）播完再播。 */
+  let afterLoopExit: { next: string; nextOnce: boolean; cuePlaybackId: string | null; url: string | null } | null =
+    null;
 
   const slotOf = (index: number): 'a' | 'b' => (index === 0 ? 'a' : 'b');
   const elementOf = (index: number): HTMLVideoElement | null => (index === 0 ? deps.videoA() : deps.videoB());
@@ -134,6 +197,30 @@ export function createOwnAnimation(deps: OwnAnimationDeps): OwnAnimation {
     const url = cueUrl;
     cueUrl = null;
     if (next === '') return;
+    // 循环状态：名字是状态名（不是素材）→ 开始这个状态，实际播它的进入段。
+    // 入口放在换源这里，随机链 / 菜单点播 / /anim / 对话联动都不用各自识别。
+    // 保持中的状态（如「等你确认」时坐着）：别的动画要播时先站起来——放开到退出段，
+    // 把这次请求挂起，退出段播完再播它（handleEnded）。同一个状态再被请求则原样保持。
+    if (!loopInternal && loopRun?.hold === true) {
+      if (next === loopRun.state.name) return;
+      afterLoopExit = { next, nextOnce, cuePlaybackId, url };
+      releaseHeld();
+      return;
+    }
+    if (url === null) {
+      const st = findLoopState(cfg.animations.states, next);
+      if (st !== null) {
+        // 当循环来播（nextOnce=false：工作状态进行中档位）= 保持模式，一直坐到有别的事
+        loopRun = startLoopState(st, !nextOnce);
+        playLoopClip(loopRun.clip, cuePlaybackId);
+        return;
+      }
+    }
+    // 不是状态机自己发起的换源 = 打断了正在进行的状态
+    if (!loopInternal) {
+      loopRun = null;
+      afterLoopExit = null;
+    }
     if (pending !== null && pending.anim === next && pending.once === nextOnce) {
       // 防重命中仍要让点播有回执，避免调用方干等超时。
       if (cuePlaybackId !== null) {
@@ -147,12 +234,16 @@ export function createOwnAnimation(deps: OwnAnimationDeps): OwnAnimation {
     }
     const swapGen = (gen += 1);
     pending = { anim: next, once: nextOnce, gen: swapGen };
+    currentClip = next;
     const targetIndex = front === 0 ? 1 : 0;
     const el = elementOf(targetIndex);
     if (el === null) return;
     el.loop = !nextOnce;
     el.muted = true;
-    el.autoplay = true;
+    // 不自动播：预载时新段要停在首帧等上一段播完，开播统一由 start() 里的 play() 负责。
+    // preload=auto 保证不自动播时 loadeddata（首帧可解码）照样会来。
+    el.autoplay = false;
+    el.preload = 'auto';
     el.playsInline = true;
     el.onended = nextOnce ? (event: Event) => deps.onEnded(handleEnded(event)) : null;
     // 元素级解码失败只补一条回执，不改播放控制；换源时与 onended 一起清掉。
@@ -202,13 +293,34 @@ export function createOwnAnimation(deps: OwnAnimationDeps): OwnAnimation {
       el.removeEventListener('loadeddata', onReady);
       if (pending?.gen !== swapGen) return;
       const outgoing = elementOf(front);
-      el.classList.add('is-front');
+      // 预载：上一段是提前收尾的，它还在播最后零点几秒。新段已解码好、停在首帧，等旧段真正播完
+      // 再开播，旧段一帧都不截。期间 pending 保持不变：被打断时新的 switchTo 覆盖 gen，start 自然作废。
+      const waitFor = preroll;
+      preroll = null;
+      if (waitFor !== null && waitFor === outgoing && !outgoing.ended && !outgoing.paused) {
+        let started = false;
+        const go = (): void => {
+          if (started) return;
+          started = true;
+          outgoing.removeEventListener('ended', go);
+          clearTimeout(safety);
+          start();
+        };
+        outgoing.addEventListener('ended', go);
+        // 兜底：ended 万一不来（解码提前停住），按剩余时长 + 余量强制开播
+        const remain = Number.isFinite(outgoing.duration) ? Math.max(0, outgoing.duration - outgoing.currentTime) : 0;
+        const safety = setTimeout(go, remain * 1000 + 300);
+        return;
+      }
+      start();
+    };
+    const start = (): void => {
+      if (pending?.gen !== swapGen) return;
+      const outgoing = elementOf(front);
       if (outgoing !== null && outgoing !== el) {
-        outgoing.classList.remove('is-front');
-        // 降级为背景的视频若继续播完，残留的 onended 会掐断当前前台动画：清 handler 并停播。
+        // 降级为背景的视频若继续播完，残留的 onended 会掐断当前前台动画：清 handler（停播在 presentSwap）。
         outgoing.onended = null;
         outgoing.onerror = null;
-        outgoing.pause();
         // 被换下的点播若没播完，如实回 cancelled（补的是点击、拖拽这类非点播打断）。
         if (playing !== null && playing !== cuePlaybackId) reportOnce(playing, 'cancelled', REASON_SUPERSEDED);
       }
@@ -216,6 +328,9 @@ export function createOwnAnimation(deps: OwnAnimationDeps): OwnAnimation {
       pending = null;
       playing = cuePlaybackId;
       el.style.transform = deps.facing() === 'right' ? 'scaleX(-1)' : '';
+      // 硬切：旧段保持可见，新段首帧真正出画后互换，旧段再垫几帧才撤（presentSwap）
+      presentSwap(el, outgoing, () => elementOf(front) === el);
+      if (nextOnce) armPreroll(el);
       el.play()
         .then(() => {
           // 只有 play() 兑现才代表确实开始出画，loadeddata 只代表可解码。
@@ -242,6 +357,28 @@ export function createOwnAnimation(deps: OwnAnimationDeps): OwnAnimation {
     if (deps.isDragging()) return { kind: 'ignore' };
     // 冻结时不推进：下面每条分支都会按当前工作状态换源，effect 的门禁拦不住。
     if (frozen) return { kind: 'ignore' };
+    // 循环状态：推进到下一段（状态机自己换源，组件什么都不用做）；退出段播完回随机链
+    if (loopRun !== null) {
+      if (currentClip === loopRun.clip) {
+        const nextRun = advanceLoopState(loopRun);
+        if (nextRun !== null) {
+          loopRun = nextRun;
+          playLoopClip(nextRun.clip, null);
+          return { kind: 'ignore' };
+        }
+        loopRun = null;
+        // 退出段播完：有挂起的请求（保持期间来的）就播它，组件那边的 anim 早已是它；否则回随机链
+        const after = afterLoopExit;
+        afterLoopExit = null;
+        if (after !== null) {
+          cueUrl = after.url;
+          switchTo(after.next, after.nextOnce, after.cuePlaybackId);
+          return { kind: 'ignore' };
+        }
+        return { kind: 'random' };
+      }
+      loopRun = null; // ended 不是状态当前那一段的：期间被顶掉过，状态作废
+    }
     const cue = decideEndedCue({
       animations: deps.cfg().animations,
       current: deps.currentAnim(),
@@ -258,10 +395,60 @@ export function createOwnAnimation(deps: OwnAnimationDeps): OwnAnimation {
     return cue;
   };
 
+  /**
+   * 预载下一段：一次性段播到只剩 PREROLL_SEC 秒时，提前把「播完」判定交给组件，让它选出下一段开始加载。
+   * switchTo 的 onReady 会等这一段真正播完再开播新段（见 preroll），所以不截这一段的尾巴。
+   * 被打断（换了别的段 / 冻结暂停 / onended 被换掉）时帧回调自然停掉。
+   */
+  /** 放开保持中的状态：改播退出段（站起来），退出段播完由 handleEnded 接着走。 */
+  function releaseHeld(): void {
+    if (loopRun === null || !loopRun.hold) return;
+    loopRun = releaseLoopState(loopRun);
+    playLoopClip(loopRun.clip, null);
+  }
+
+  /** 状态机自己换段：标记为内部换源，不算打断。每段都 once=true，靠 ended 推进。 */
+  function playLoopClip(clip: string, cuePlaybackId: string | null): void {
+    loopInternal = true;
+    try {
+      switchTo(clip, true, cuePlaybackId);
+    } finally {
+      loopInternal = false;
+    }
+  }
+
+  const armPreroll = (el: HTMLVideoElement): void => {
+    const fv = el as FrameVideo;
+    if (typeof fv.requestVideoFrameCallback !== 'function') return;
+    const cb = el.onended;
+    if (cb === null) return;
+    const tick = (_now: number, meta: { mediaTime: number }): void => {
+      if (!mounted || el.onended !== cb || el.loop) return;
+      const d = el.duration;
+      if (Number.isFinite(d) && d - meta.mediaTime <= PREROLL_SEC) {
+        el.onended = null; // 只触发一次：真正的 ended 不再重复收尾
+        preroll = el;
+        const cue = handleEnded();
+        // 不推进（拖拽中 / 冻结）：撤掉标记，免得之后的点击还要等这一段播完。
+        // 循环状态推进也回 ignore，但它已同步发起换源（pending 非空），标记要留给那次换源。
+        if (cue.kind === 'ignore' && pending === null) preroll = null;
+        deps.onEnded(cue);
+        return;
+      }
+      fv.requestVideoFrameCallback?.(tick);
+    };
+    fv.requestVideoFrameCallback(tick);
+  };
+
   return {
     switchTo,
     handleEnded,
     stopLoopingFront: () => {
+      // 保持中的状态（等确认时坐着）：回空闲 = 站起来，站完回随机链
+      if (loopRun?.hold === true) {
+        releaseHeld();
+        return;
+      }
       const el = frontVideo();
       if (el === null) return;
       el.loop = false;

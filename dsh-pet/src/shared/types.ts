@@ -4,6 +4,7 @@
  * 纯类型与常量，无 React / DOM 依赖。
  * @module dsh-pet/src/shared/types
  */
+import type { LoopState } from './loop-states.ts';
 
 /** 支持的角落。 */
 export type Corner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
@@ -73,6 +74,9 @@ export interface Animations {
   /** 睡觉动作套（可选）：没写 = 该条目没有睡觉功能，右键菜单不出现「睡觉」。
    *  写了就「整套随机 → 段内随机」取，结构见 {@link SleepSet}。 */
   sleep?: SleepSet[];
+  /** 循环状态（可选）：「进入 → 循环若干遍 → 退出」的动作，如坐下坐一会儿再站起来。
+   *  状态名写进 categories 的 actions 即进随机链；结构与推进规则见 shared/loop-states。 */
+  states?: LoopState[];
   /** 内置玩法「吃白饭」的动画（可选）：键名即玩法 id，值是**恰好 5 个**动画名，
    *  按位置对应：跑向屏幕底部、追饭时的侧身跑、到位后等开饭、吃到碗饭、吃饭团。
    *  不写 = 该条目没有这个玩法；槽位数与顺序是玩法契约（代码按索引取），名字只是素材文件名。 */
@@ -106,6 +110,9 @@ export interface Pet {
   /** 宠物固定：true = 随机链不抽转向与移动两档（权重按 0 算，份额并入原地小动作），只影响随机链——
    *  右键点播、/anim 接口、事件动画、点击回应与拖拽一律照常。缺失默认 false。 */
   fixedEnabled: boolean;
+  /** 没人理多少分钟后自己去睡（可选）：缺省 / 0 = 关闭。「有人理」= 点 / 拖、打开对话、DSH 开始干活；
+   *  自己睡着的宠物在 DSH 再次干活时自己醒，判定见 shared/auto-sleep。需要条目配了 animations.sleep。 */
+  autoSleepMinutes?: number;
   /** 显示位置（必填）：缺失即配置错误，代码不做兜底 */
   display: PetDisplay;
   position: { corner: Corner; marginX: number; marginY: number };

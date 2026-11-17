@@ -124,3 +124,23 @@ describe('fitWindowInArea —— 与角落定位拼起来的端到端落点', ()
     assert.equal(fit.y + fit.offsetY, 782.5, '底：1040 − 247.5 − 10 = 782.5');
   });
 });
+
+describe('漫游范围', async () => {
+  const { shouldTurnInsteadOfWalk, updateWanderHome } = await import('./motion.ts');
+  test('家：第一次走位前定下；按走位走到的位置不改；被挪过（离上次终点 >3px）就改成当前位置', () => {
+    const w = { home: null as number | null, lastWalkX: null as number | null };
+    updateWanderHome(w, 500);
+    assert.equal(w.home, 500);
+    w.lastWalkX = 380; // 走到 380
+    updateWanderHome(w, 380);
+    assert.equal(w.home, 500, '自己走过去的不算挪');
+    updateWanderHome(w, 900); // 被拖到 900
+    assert.equal(w.home, 900);
+  });
+  test('转身判定：开了范围才生效；撞边或离家超出范围都转身', () => {
+    assert.equal(shouldTurnInsteadOfWalk(0, 500, null), false, '不开范围保持原行为');
+    assert.equal(shouldTurnInsteadOfWalk(300, 500, null), true, '撞边');
+    assert.equal(shouldTurnInsteadOfWalk(300, 500, 790), false);
+    assert.equal(shouldTurnInsteadOfWalk(300, 500, 810), true, '离家超出范围');
+  });
+});
