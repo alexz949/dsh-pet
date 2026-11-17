@@ -4,6 +4,7 @@ const { BrowserWindow, desktopCapturer, dialog, screen } = require('electron');
 const { importPetInteractive } = require('./import.js');
 const { dshHomeDir } = require('./user-data.js');
 const { savePose } = require('./poses.js');
+const { copyPetInteractive, deletePetInteractive } = require('./manage.js');
 const { decideWindowIgnore } = require('../pointer-target.js');
 /**
  * 渲染端到主进程的 ipc：窗口跟随、飞行状态、碰撞转发、穿透翻转、输入租约与菜单首项（打开软件 / 打开 AI 设置）。
@@ -201,6 +202,26 @@ function registerIpc({ ipcMain, petWindows, shell, openTarget, petRoute }) {
     } finally {
       importing = false;
     }
+  });
+
+  // 复制一只 / 删除（右键菜单）：改宠物包配置；成功后由渲染端请宿主重载。「隐藏」走宿主的 /pet-display。
+  const petDirOf = () => path.join(dshHomeDir(), 'dsh-pet', 'pet');
+  ipcMain.handle('pet:copy-pet', async (event, msg) => {
+    const parent = BrowserWindow.fromWebContents(event.sender) || undefined;
+    const mainConfigPath = path.join(dshHomeDir(), 'dsh-pet', 'main-config.jsonc');
+    return copyPetInteractive({ dialog, parent, petDir: petDirOf(), mainConfigPath, pack: msg?.pack, id: msg?.id });
+  });
+  ipcMain.handle('pet:delete-pet', async (event, msg) => {
+    const parent = BrowserWindow.fromWebContents(event.sender) || undefined;
+    return deletePetInteractive({
+      dialog,
+      shell,
+      parent,
+      petDir: petDirOf(),
+      pack: msg?.pack,
+      id: msg?.id,
+      name: msg?.name,
+    });
   });
 
   ipcMain.handle('pet:capture-screen', async (event) => {

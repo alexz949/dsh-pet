@@ -67,6 +67,13 @@ contextBridge.exposeInMainWorld('petBridge', {
   savePose(id, pose) {
     ipcRenderer.send('pet:save-pose', { id, pose });
   },
+  /** 复制一只 / 删除：主进程改宠物包配置（删除会先确认），返回 { ok }。 */
+  copyPet(pack, id) {
+    return ipcRenderer.invoke('pet:copy-pet', { pack, id });
+  },
+  deletePet(pack, id, name) {
+    return ipcRenderer.invoke('pet:delete-pet', { pack, id, name });
+  },
   /** 导入干员：主进程弹选择框并生成宠物包，返回 { ok }。 */
   importPet() {
     return ipcRenderer.invoke('pet:import-pet');

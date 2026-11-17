@@ -32,6 +32,10 @@ Object.assign(PetSprite.prototype, {
       { label: '待办事项', action: 'todo', hint: S.TODO_HOTKEY_HINT },
       // 导入干员：选基建小人的透明 webm，生成新宠物包（主进程做，不需要 ffmpeg）
       { label: '导入干员…', action: 'import-pet' },
+      // 这一只：复制（多开一只同样的）/ 隐藏（display=none，托盘勾选叫回）/ 删除（先确认，最后一只进废纸篓）
+      { label: '复制一只', action: 'copy-pet' },
+      { label: '隐藏', action: 'hide-pet' },
+      { label: '删除…', action: 'delete-pet' },
     ];
     const rare = [
       // 首项文案与去向随宿主形态变（打开软件 / 打开 AI 设置 / 打开网站），见 OPEN_LABEL
@@ -158,6 +162,14 @@ Object.assign(PetSprite.prototype, {
     }
     if (leaf.action === 'set-display') {
       this.setPetDisplay(leaf.display); // 改这只宠物的显示位置：写 display 配置，由宿主重载生效
+      return;
+    }
+    if (leaf.action === 'copy-pet' || leaf.action === 'delete-pet') {
+      this.managePet(leaf.action);
+      return;
+    }
+    if (leaf.action === 'hide-pet') {
+      this.setPetDisplay('none'); // 不删配置：菜单栏托盘里勾上它就回来
       return;
     }
     if (leaf.action === 'import-pet') {
@@ -415,6 +427,21 @@ Object.assign(PetSprite.prototype, {
         if (r && r.ok) this.reloadDesktop();
       })
       .catch((e) => console.warn('[dsh-pet] 导入干员失败', e));
+  },
+
+  // 复制一只 / 删除：主进程改配置（删除的确认弹窗也在那边），成功后重载让窗口按新配置重建
+  managePet(action) {
+    const b = window.petBridge;
+    if (!b) return;
+    const pack = this.pet.assetRoot || null;
+    const call =
+      action === 'copy-pet' ? b.copyPet?.(pack, this.pet.id) : b.deletePet?.(pack, this.pet.id, this.pet.name);
+    if (!call) return;
+    call
+      .then((r) => {
+        if (r && r.ok) this.reloadDesktop();
+      })
+      .catch((e) => console.warn('[dsh-pet] ' + action + ' 失败', e));
   },
 
   reloadDesktop() {

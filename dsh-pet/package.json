@@ -1,6 +1,6 @@
 {
   "name": "dsh-pet",
-  "version": "0.4.9-plus.3",
+  "version": "0.4.9-plus.4",
   "description": "dsh-pet 改进版（基于 PC2005-cloud/dsh-pet）：换段无闪烁、循环状态（坐一会儿再起来 / 等确认时坐着）、漫游范围、没人理自己睡、精简菜单、macOS 硬件解码。",
   "icon": "assets/logo.png",
   "keywords": [
