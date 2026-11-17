@@ -1,5 +1,9 @@
 'use strict';
-const { BrowserWindow, desktopCapturer, screen } = require('electron');
+const path = require('node:path');
+const { BrowserWindow, desktopCapturer, dialog, screen } = require('electron');
+const { importPetInteractive } = require('./import.js');
+const { dshHomeDir } = require('./user-data.js');
+const { savePose } = require('./poses.js');
 const { decideWindowIgnore } = require('../pointer-target.js');
 /**
  * 渲染端到主进程的 ipc：窗口跟随、飞行状态、碰撞转发、穿透翻转、输入租约与菜单首项（打开软件 / 打开 AI 设置）。
@@ -182,6 +186,23 @@ function registerIpc({ ipcMain, petWindows, shell, openTarget, petRoute }) {
    * 截一帧桌面：只取宠物所在那块屏，按物理像素请求缩略图，回一次 JPEG base64。
    * 不做流、不落盘；渲染端拿到后与上传图片走同一条预算编码。
    */
+  // 位置记录：渲染端定时报会话内位置，重载后据此还原（见 poses.js）
+  ipcMain.on('pet:save-pose', (_event, msg) => savePose(msg?.id, msg?.pose ?? null));
+
+  // 导入干员（「更多」菜单）：选素材 → 生成宠物包。同一时间只跑一个；成功后由渲染端请宿主重载。
+  let importing = false;
+  ipcMain.handle('pet:import-pet', async (event) => {
+    if (importing) return { ok: false, busy: true };
+    importing = true;
+    try {
+      const parent = BrowserWindow.fromWebContents(event.sender) || undefined;
+      const petDir = path.join(dshHomeDir(), 'dsh-pet', 'pet');
+      return await importPetInteractive({ dialog, BrowserWindow, ipcMain, petDir, parent });
+    } finally {
+      importing = false;
+    }
+  });
+
   ipcMain.handle('pet:capture-screen', async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     const display = win ? screen.getDisplayMatching(win.getBounds()) : screen.getPrimaryDisplay();

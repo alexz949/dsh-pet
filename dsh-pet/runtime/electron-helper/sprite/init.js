@@ -7,6 +7,10 @@
  */
 'use strict';
 
+/** 位置记录：每 POSE_SAVE_MS 检查一次，变了就报；没变也每 POSE_REFRESH_MS 报一次保持新鲜（主进程认 15 秒内的）。 */
+const POSE_SAVE_MS = 1000;
+const POSE_REFRESH_MS = 5000;
+
 Object.assign(PetSprite.prototype, {
   initPlayback(pet) {
     // 动画池与权重由拍平层按条目注入（renderer 的 S.flattenConfigPets），条目缺 animations 就是配置不全：
@@ -213,7 +217,39 @@ Object.assign(PetSprite.prototype, {
     this.el.appendChild(this.tip);
     this.el.appendChild(stage);
     rootEl.appendChild(this.el);
+    // 重载（导入干员、改显示位置、重载配置）会重启整个桌面进程，会话内位置跟着丢，所有宠物都跳回
+    // 配置角落。刚重启时若有几秒内记下的位置就接着站在原处；正常开机记录早已过期，照旧回角落。
+    const saved = this.readSavedPose();
+    if (saved) {
+      this.customPos = { rx: saved.rx, ry: saved.ry };
+      if (saved.facing === 'left' || saved.facing === 'right') this._facing = saved.facing;
+    }
     this.position();
+    this.poseSaveTimer = window.setInterval(() => this.savePose(), POSE_SAVE_MS);
+  },
+
+  /** 报当前位置与朝向给主进程（只在变化时报；在角落报 null）。 */
+  savePose() {
+    if (!window.petBridge || typeof window.petBridge.savePose !== 'function') return;
+    const pose = this.customPos ? { rx: this.customPos.rx, ry: this.customPos.ry, facing: this.facing } : null;
+    const key = JSON.stringify(pose);
+    // 位置没变也隔一段时间再报一次，保持记录「新鲜」（主进程只认几秒内的记录）
+    if (key === this.lastPoseKey && Date.now() - this.lastPoseAt < POSE_REFRESH_MS) return;
+    this.lastPoseKey = key;
+    this.lastPoseAt = Date.now();
+    window.petBridge.savePose(this.pet.id, pose);
+  },
+
+  /** 建窗时主进程带来的重载前位置（URL 参数 pose）；没有或坏数据返回 null。 */
+  readSavedPose() {
+    try {
+      const p = JSON.parse(params.get('pose') || 'null');
+      if (!p || !Number.isFinite(p.rx) || !Number.isFinite(p.ry)) return null;
+      if (p.rx < 0 || p.rx > 1 || p.ry < 0 || p.ry > 1) return null;
+      return p;
+    } catch {
+      return null;
+    }
   },
 
   /** 绑定指针、窗口与碰撞广播；一次性 AbortController 在 dispose 里统一取消。 */

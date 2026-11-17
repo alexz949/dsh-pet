@@ -63,6 +63,14 @@ contextBridge.exposeInMainWorld('petBridge', {
   captureScreen() {
     return ipcRenderer.invoke('pet:capture-screen');
   },
+  /** 位置记录：重载后接着站在原处（主进程写盘）。 */
+  savePose(id, pose) {
+    ipcRenderer.send('pet:save-pose', { id, pose });
+  },
+  /** 导入干员：主进程弹选择框并生成宠物包，返回 { ok }。 */
+  importPet() {
+    return ipcRenderer.invoke('pet:import-pet');
+  },
   // 宠物间碰撞（跨窗 broker）：位置与速度随 setBounds 捎带，主进程汇聚后广播；被撞方收 pet:hit 后按新初速抛出。
   onFlightStates(cb) {
     ipcRenderer.on('pet:flight-states', (e, states) => cb(states));

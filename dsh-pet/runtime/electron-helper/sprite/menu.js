@@ -30,6 +30,8 @@ Object.assign(PetSprite.prototype, {
       ...(speech ? [{ label: '对话', action: 'chat', hint: S.CHAT_HOTKEY_HINT }] : []),
       // 「待办事项」是待办面板的唯一入口（单击宠物不再弹面板）
       { label: '待办事项', action: 'todo', hint: S.TODO_HOTKEY_HINT },
+      // 导入干员：选基建小人的透明 webm，生成新宠物包（主进程做，不需要 ffmpeg）
+      { label: '导入干员…', action: 'import-pet' },
     ];
     const rare = [
       // 首项文案与去向随宿主形态变（打开软件 / 打开 AI 设置 / 打开网站），见 OPEN_LABEL
@@ -156,6 +158,10 @@ Object.assign(PetSprite.prototype, {
     }
     if (leaf.action === 'set-display') {
       this.setPetDisplay(leaf.display); // 改这只宠物的显示位置：写 display 配置，由宿主重载生效
+      return;
+    }
+    if (leaf.action === 'import-pet') {
+      this.importPet();
       return;
     }
     if (leaf.action === 'reload') {
@@ -400,6 +406,17 @@ Object.assign(PetSprite.prototype, {
   // 一次性启动的（loopsStarted），就地重建会漏启新循环或留下旧定时器。
   // 本请求由即将被重启的进程发出，响应可能永远不回（宿主杀进程时回调地址已失效），故不 await、
   // 不重试，失败只记日志——重载本身就是把本进程换掉。
+  // 导入干员：结果弹窗由主进程负责；导入成功后重载，新宠物随窗口重建出现
+  importPet() {
+    if (!window.petBridge || typeof window.petBridge.importPet !== 'function') return;
+    window.petBridge
+      .importPet()
+      .then((r) => {
+        if (r && r.ok) this.reloadDesktop();
+      })
+      .catch((e) => console.warn('[dsh-pet] 导入干员失败', e));
+  },
+
   reloadDesktop() {
     fetch(BASE + '/reload', { method: 'POST' }).catch((e) => {
       console.warn('[dsh-pet] 重载配置请求失败（宿主不可达？）', e);

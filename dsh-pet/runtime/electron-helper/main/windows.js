@@ -7,6 +7,7 @@
  * @module dsh-pet/runtime/electron-helper/main/windows
  */
 const path = require('node:path');
+const { freshPose } = require('./poses.js');
 const { pointerZone, decideWindowIgnore, leavesBody } = require('../pointer-target.js');
 const { TOPMOST_WATCHDOG_ENABLED, TOPMOST_WATCHDOG_TICK_MS } = require('../topmost-watchdog.js');
 const { TASKBAR_WATCHDOG_TICK_MS, shouldRunTaskbarWatchdog } = require('../taskbar-watchdog.js');
@@ -303,6 +304,11 @@ function createWindows({
       // X11 的窗口管理器把普通窗口钳在工作区内，窗口探不出屏幕；Windows / macOS 没这个限制。
       // 渲染端据此决定要不要把钳掉的量转成本体在窗口内的偏移（见 fitWindow）。
       isWindowClampedToWorkArea: process.platform === 'linux' ? '1' : '0',
+      // 重载前几秒的位置（见 poses.js）：有就接着站在原处，没有就按配置角落
+      ...(() => {
+        const pose = freshPose(pet.id);
+        return pose ? { pose: JSON.stringify(pose) } : {};
+      })(),
     };
   }
 
