@@ -4,7 +4,7 @@
 
 基于 **[PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet)**（MIT）改进，是 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）的桌面宠物插件，也能不开 DSH 单独运行。
 
-> **想先看看效果？** 仓库里带了两个示例干员（维什戴尔、逻各斯），见 [samples/](samples/)。其它干员的动画（webm）需要你自己准备，再用「导入干员」导入。本项目是非官方的同人工具，与上海鹰角网络科技有限公司无关；《明日方舟》素材版权归鹰角网络所有，见文末[版权声明](#版权声明)。
+> **装上就有三个示例干员**：阿米娅直接出现在桌面上，维什戴尔（带战斗动作）和逻各斯先藏着，点菜单栏的 🐾 图标勾选就能叫出来。其它干员的动画（webm）需要你自己准备，再用「导入干员」导入。本项目是非官方的同人工具，与上海鹰角网络科技有限公司无关；《明日方舟》素材版权归鹰角网络所有，见文末[版权声明](#版权声明)。
 
 ## 快速开始
 
@@ -17,9 +17,9 @@
    | 不用 DSH（独立模式）     | `npm install -g ~/Downloads/dsh-pet-<版本>.tgz`，然后 `dsh-pet-standalone` | 需要 Node.js ≥ 22.12；首次启动会下载一次 Electron（约 110 MB）                                                                                   |
    | 配合 Claude Code / Codex | 见下面[配合 Claude Code / Codex](#配合-claude-code--codex)                 | 会话开始时自动拉起桌宠，干活时联动                                                                                                               |
 
-3. 准备干员素材（只想试试的话，直接用 [samples/](samples/) 里的示例干员，跳过 3–5 步）：在 PRTS 的干员页面下载**基建小人**的透明 webm（`Relax` / `Move` / `Sit` / `Sleep` / `Interact` / `Special`），想要战斗动作再下载**战斗小人**的（`Attack` / `Skill_x` / `Start`…）。
-4. 第一次还没有桌宠：点菜单栏（Windows 是任务栏通知区）的 🐾 图标 →「**导入干员…**」，选基建小人的文件。之后右键任意一只桌宠也有这一项。
-5. 想要战斗动作：右键新干员 →「**追加动作…**」，选战斗小人的文件。
+3. 第一次启动会自动放入三个[示例干员](dsh-pet/samples/)：**阿米娅**直接出现在桌面上；**维什戴尔**（带攻击、技能、出场动作）和**逻各斯**先藏着，点菜单栏（Windows 是任务栏通知区）的 🐾 图标勾选就能叫出来。已经有自己干员的老用户不会被塞进示例。
+4. 想加别的干员：在 PRTS 的干员页面下载**基建小人**的透明 webm（`Relax` / `Move` / `Sit` / `Sleep` / `Interact` / `Special`），右键任意桌宠（或点 🐾 图标）→「**导入干员…**」。
+5. 想要战斗动作：再下载**战斗小人**的 webm（`Attack` / `Skill_x` / `Start`…），右键这个干员 →「**追加动作…**」。
 
 ## 干员
 
@@ -121,6 +121,7 @@ dsh plugin --profile desktop add ../release/dsh-pet-<版本>.tgz
 │   │   ├── importer/        # 导入干员、追加动作：解码 / 对齐 / 编码，透明 webm 封装
 │   │   ├── main/            # Electron 主进程：窗口、导入、复制隐藏删除、位置记录
 │   │   └── sprite/          # 每只宠物的播放、动作与右键菜单
+│   ├── samples/             # 示例干员（首次运行自动放入；素材版权归鹰角网络，不适用 MIT）
 │   └── lib/                 # 构建产物（npm run build 生成）
 ├── integrations/            # Claude Code / Codex 插件
 ├── .claude-plugin/  .agents/plugins/   # 两个插件市场的清单
@@ -133,7 +134,7 @@ dsh plugin --profile desktop add ../release/dsh-pet-<版本>.tgz
 
 ## 许可与致谢
 
-- **代码**：MIT（见 [LICENSE](LICENSE)），只覆盖本仓库的代码与文档，**不覆盖任何游戏素材**（包括 [samples/](samples/) 里的示例干员）。
+- **代码**：MIT（见 [LICENSE](LICENSE)），只覆盖本仓库的代码与文档，**不覆盖任何游戏素材**（包括 [dsh-pet/samples/](dsh-pet/samples/) 里的示例干员）。
 - **原作者**：基于 [PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet)，原作者的版权与许可证保留；按原项目的二创约定，衍生作品须在公开渠道注明原作者地址 <https://github.com/PC2005-cloud/dsh-pet>。
 
 ## 版权声明
@@ -142,6 +143,6 @@ dsh plugin --profile desktop add ../release/dsh-pet-<版本>.tgz
 
 All Arknights character models and animation assets are property of Hypergryph / Studio Montagne. This project is an unofficial fan tool for non-commercial, personal use only.
 
-- 只有 [samples/](samples/) 目录带了两个示例干员（已转换格式的动画），不适用 MIT 许可证；Releases 里的发布包**不包含**任何明日方舟素材。其它素材由使用者自行获取。
+- 仓库的 [dsh-pet/samples/](dsh-pet/samples/) 和 Releases 里的发布包带了三个示例干员（阿米娅、维什戴尔、逻各斯，已转换格式的动画），不适用 MIT 许可证；其它素材由使用者自行获取。
 - 本工具**不会自动从 PRTS 或任何网站下载素材**，只处理你本地选中的文件。手动下载时请适度，不要批量抓取 PRTS 等社区 Wiki 的媒体资源。
 - 请勿用于售卖、商业用途或冒充官方应用。如权利方认为本项目有不妥之处，请通过 [Issues](https://github.com/alexz949/dsh-pet/issues) 联系，会立即删除相关素材。

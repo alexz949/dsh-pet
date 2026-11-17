@@ -19,6 +19,7 @@ import { MenuRegistry } from '../menu.ts';
 import { PACKAGE_MEMES_DIR, PACKAGE_ROOT } from '../paths.ts';
 import { PlaybackStore } from '../playback.ts';
 import { resolveAsset } from '../http.ts';
+import { seedSamplePets } from '../samples.ts';
 import { PollStateStore } from '../state.ts';
 import { WorkStatusStore } from '../work-status.ts';
 import type { StandaloneWhisperPolicy } from '../whisper-policy.ts';
@@ -170,6 +171,14 @@ export function createHostSetup(ctx: HostSetupContext): HostSetup {
   // 老用户一次性迁移：main-config.json → main-config.jsonc（重命名，内容一字不动；
   // 新文件已存在则不动旧文件）。失败不影响运行——读取侧对旧路径有回落。
   migrateUserConfig(configPaths, (msg) => log.info('[dsh-pet] ' + msg));
+
+  // 全新安装：放入包内示例干员（阿米娅显示，其余隐藏）；老用户已有宠物包时只写标记、不动（见 ../samples）
+  seedSamplePets({
+    samplesDir: join(PACKAGE_ROOT, 'samples'),
+    petDir: petConfigDir,
+    userRoot,
+    log: (msg) => log.info('[dsh-pet] ' + msg),
+  });
 
   // 用户动画目录（thumb 播放时优先于包内素材；webm 放 main-animation/webm/，mov（macOS 定制）放 main-animation/mov/）
   const thumbUserRoot = join(userRoot, 'main-animation');

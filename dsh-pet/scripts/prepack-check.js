@@ -61,6 +61,12 @@ const required = [
   'lib/types/client/index.d.ts', // 客户端类型声明
   'cordis.patch.yml', // bundle patch（挂载声明）
   'runtime/electron-helper/main.js', // 桌面模式 Electron 主进程
+  'samples/op-b32d35e6-config.json', // 示例干员：首次运行放入（缺了全新安装没有宠物）
+  'runtime/electron-helper/main/import.js', // 导入干员（ipc.js / main.js require）
+  'runtime/electron-helper/main/append.js', // 追加动作（ipc.js require）
+  'runtime/electron-helper/main/manage.js', // 复制 / 隐藏 / 删除（ipc.js / main.js require）
+  'runtime/electron-helper/main/poses.js', // 重载留在原处（ipc.js / windows.js require）
+  'runtime/electron-helper/importer/page.html', // 导入窗口
   'runtime/electron-helper/main/smoke.js', // 桌面模式冒烟自检（main.js require，缺了启动即崩）
   'runtime/electron-helper/main/dpi.js', // 桌面模式 DPI 与指针（main.js require，缺了启动即崩）
   'runtime/electron-helper/main/bridge.js', // 桌面模式与宿主通道（同上）

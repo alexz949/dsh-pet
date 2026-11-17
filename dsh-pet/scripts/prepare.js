@@ -57,9 +57,10 @@ const keep = [
   'assets/config.jsonc',
   // 插件图标：package.json 顶层 icon 指向这张图；缺图时读取方 dsh-app-boot 的 iconOf 会抛错、退回默认插画。
   'assets/logo.png',
-  // 本 fork 不再内置角色（原作者的 AI 生成角色与它的动画 / 表情包 / 参考图都已移除）：
-  // 角色全部来自用户放进 $DSH_HOME/dsh-pet/pet/ 的宠物包，所以 assets/webm、assets/memes、
-  // assets/main-character.png 不再进包。
+  // 本 fork 不再内置原作者的角色（AI 生成角色与它的动画 / 表情包 / 参考图都已移除），
+  // assets/webm、assets/memes、assets/main-character.png 不再进包。
+  // 示例干员：首次运行由宿主复制进 $DSH_HOME/dsh-pet/pet/（src/host/samples.ts）；素材版权归鹰角网络，见 samples/README.md。
+  'samples',
   'scripts/ensure-electron.mjs',
   'cordis.patch.yml',
 ];
