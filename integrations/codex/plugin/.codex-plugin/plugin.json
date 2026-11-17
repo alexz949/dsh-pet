@@ -1,0 +1,17 @@
+{
+  "name": "dsh-pet",
+  "version": "0.1.0",
+  "description": "让 dsh-pet 桌宠跟着 Codex 干活：思考、调用工具、等你批准（坐下等）、完成。没开 DSH 时自动用独立模式拉起桌宠。",
+  "author": { "name": "alexz949", "url": "https://github.com/alexz949" },
+  "homepage": "https://github.com/alexz949/dsh-pet/tree/main/integrations/codex",
+  "repository": "https://github.com/alexz949/dsh-pet",
+  "license": "MIT",
+  "keywords": ["desktop-pet", "dsh-pet", "hooks"],
+  "interface": {
+    "displayName": "dsh-pet 桌宠",
+    "shortDescription": "让桌宠跟着 Codex 干活",
+    "longDescription": "Codex 思考、调用工具、等你批准、完成时，dsh-pet 桌宠播放对应动作（等批准时坐下来等）。没开 DSH 时自动用独立模式在后台拉起桌宠。",
+    "developerName": "alexz949",
+    "category": "Productivity"
+  }
+}
