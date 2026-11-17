@@ -1,6 +1,6 @@
 {
   "name": "dsh-pet",
-  "version": "0.4.9-plus.7",
+  "version": "0.4.9-plus.8",
   "description": "dsh-pet 改进版（基于 PC2005-cloud/dsh-pet）：换段无闪烁、循环状态（坐一会儿再起来 / 等确认时坐着）、漫游范围、没人理自己睡、精简菜单、macOS 硬件解码。",
   "icon": "assets/logo.png",
   "keywords": [
@@ -14,13 +14,14 @@
     "cordis",
     "react"
   ],
-  "homepage": "https://github.com/PC2005-cloud/dsh-pet#readme",
+  "homepage": "https://github.com/alexz949/dsh-pet#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/PC2005-cloud/dsh-pet.git"
+    "url": "git+https://github.com/alexz949/dsh-pet.git",
+    "directory": "dsh-pet"
   },
   "bugs": {
-    "url": "https://github.com/PC2005-cloud/dsh-pet/issues"
+    "url": "https://github.com/alexz949/dsh-pet/issues"
   },
   "_comment": [
     "=============== dsh-pet 包清单说明 ===============",

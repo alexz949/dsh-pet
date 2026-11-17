@@ -28,6 +28,20 @@ codex plugin marketplace add alexz949/dsh-pet && codex plugin add dsh-pet@dsh-pe
 
 详见 [integrations/claude-code](integrations/claude-code/README.md) 与 [integrations/codex](integrations/codex/README.md)。
 
+## 安装（下载发布包）
+
+1. 到 [Releases](https://github.com/alexz949/dsh-pet/releases) 下载最新的 `dsh-pet-<版本>.tgz`。
+2. 装进 DeepSeek Harness（桌面应用；dsh web 用户把 `desktop` 换成 `web`），装完**重开 DSH**：
+
+   ```sh
+   dsh plugin --profile desktop add ~/Downloads/dsh-pet-<版本>.tgz
+   ```
+
+   macOS 桌面应用自带的 `dsh` 在 `/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh`。
+
+3. 不用 DSH 也行（独立模式，Node.js ≥ 22.12）：`npm install -g ~/Downloads/dsh-pet-<版本>.tgz`，然后运行 `dsh-pet-standalone`。首次启动会下载一次 Electron（约 110 MB）。
+4. 本插件**不带任何角色**：右键桌宠 →「导入干员…」导入你自己的基建小人 webm（见下面[导入干员](#导入干员一键做宠物包)），或把宠物包放进 `~/.dsh/dsh-pet/pet/`。
+
 ## 安装（从源码）
 
 ```sh
