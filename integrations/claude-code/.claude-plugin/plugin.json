@@ -1,0 +1,10 @@
+{
+  "name": "dsh-pet",
+  "version": "0.1.0",
+  "description": "让 dsh-pet 桌宠跟着 Claude Code 干活：思考、调用工具、等你批准（坐下等）、完成。没开 DSH 时自动用独立模式拉起桌宠。",
+  "author": { "name": "alexz949", "url": "https://github.com/alexz949" },
+  "homepage": "https://github.com/alexz949/dsh-pet/tree/main/integrations/claude-code",
+  "repository": "https://github.com/alexz949/dsh-pet",
+  "license": "MIT",
+  "keywords": ["desktop-pet", "dsh-pet", "hooks"]
+}

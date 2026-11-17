@@ -14,6 +14,16 @@
 - **精简右键菜单**：常用项一层，其余收进「更多」；动作少的宠物不分组、去重，走法合并成一项
 - 点击不再 Q 弹、默认不出声；macOS 桌面端优先用 HEVC 透明 `.mov` 硬件解码（约省 30% CPU）
 
+## 配合 Claude Code 使用
+
+桌宠可以跟着 Claude Code 干活（思考、调用工具、等你批准时坐下来等、完成），不开 DSH 也行——插件会用独立模式在后台拉起桌宠：
+
+```
+/plugin install dsh-pet --marketplace alexz949/dsh-pet
+```
+
+详见 [integrations/claude-code](integrations/claude-code/README.md)。
+
 ## 安装（从源码）
 
 ```sh
