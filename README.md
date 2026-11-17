@@ -92,10 +92,6 @@ codex plugin add dsh-pet@dsh-pet
 
 完整字段见 **[CONFIG.md](CONFIG.md)**；从零制作非明日方舟的宠物见 [MAKE-YOUR-OWN-PET.md](MAKE-YOUR-OWN-PET.md)。
 
-## 资源占用
-
-只有显示在桌面上的宠物才占资源。实测（Apple M3，导入的干员）：每只约 130 MB 内存、5–8% 单核 CPU；另有一份公共开销约 250 MB。隐藏的宠物为零。
-
 ## 兼容性
 
 - **系统**：macOS / Windows / Linux；Electron 按平台自动下载。
